@@ -224,6 +224,9 @@ func pointer_up(pos: Vector2, index: int) -> void:
  var single := touches.size() == 1
  touches.erase(index)
  if not single or dragging: return
+ if tutorial == 0:
+  tutorial = 1
+  return
  var button := ui_button_at(pos)
  if button != "": choose_button(button)
  elif pos.y > 89.0 and pos.y < size.y - 106.0: edit_at(pos)

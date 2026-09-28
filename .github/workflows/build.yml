@@ -5,6 +5,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
       - name: Install Godot 4.4.1 and templates
@@ -43,12 +46,12 @@ jobs:
           cd build && zip -q CircuitBloom-Windows.zip CircuitBloom.exe
           if [ -f CircuitBloom.pck ]; then zip -q CircuitBloom-Windows.zip CircuitBloom.pck; fi
       - name: Export Android debug
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
+          cat "$HOME/.config/godot/editor_settings-4.4.tres"
+          ls -ld "$ANDROID_HOME/platform-tools" "$ANDROID_HOME/build-tools" "$JAVA_HOME"
+          ls "$ANDROID_HOME/build-tools"
           keytool -genkeypair -keystore /tmp/circuit-debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
-          GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/circuit-debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android godot --headless --path . --export-debug Android build/CircuitBloom-Android-debug.apk
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/circuit-debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android godot --headless --verbose --path . --export-debug Android build/CircuitBloom-Android-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: CircuitBloom-Android-debug.apk

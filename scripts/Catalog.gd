@@ -15,8 +15,8 @@ const PARTS := {
 const ORDER := ["vein", "bundle", "gland", "processor", "cluster", "radiator", "cooler", "capacitor"]
 const GOALS := [
  {"name":"FIRST PULSE", "target":50.0, "seconds":0.2, "size":14, "biomass":160, "reward":"Capacitor Cell"},
- {"name":"STABLE CIRCUIT", "target":120.0, "seconds":15.0, "size":18, "biomass":280, "reward":"Cooling Gland"},
- {"name":"LIVING NETWORK", "target":250.0, "seconds":20.0, "size":22, "biomass":500, "reward":"Neural Bundle + Processor Cluster"},
+ {"name":"STABLE CIRCUIT", "target":120.0, "seconds":15.0, "size":18, "biomass":360, "reward":"Cooling Gland"},
+ {"name":"LIVING NETWORK", "target":250.0, "seconds":20.0, "size":22, "biomass":620, "reward":"Neural Bundle + Processor Cluster"},
  {"name":"SYNAPTIC GROWTH", "target":500.0, "seconds":30.0, "size":24, "biomass":950, "reward":"Full substrate"},
  {"name":"AWAKENING", "target":1000.0, "seconds":60.0, "size":24, "biomass":950, "reward":"Autonomous computation"}
 ]
