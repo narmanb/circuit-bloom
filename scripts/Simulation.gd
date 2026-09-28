@@ -54,7 +54,7 @@ func biomass_used() -> int:
   total += Catalog.PARTS[p.id].cost
  return total
 
-func place(id: String, x: int, y: int, initial := false) -> bool:
+func can_place(id: String, x: int, y: int, initial := false) -> bool:
  if not Catalog.PARTS.has(id): return false
  var d: Dictionary = Catalog.PARTS[id]
  if not initial and d.get("unlock", 0) > level: return false
@@ -63,6 +63,10 @@ func place(id: String, x: int, y: int, initial := false) -> bool:
  for cy in range(y, y + sz):
   for cx in range(x, x + sz):
    if cx < 0 or cy < 0 or cx >= W or cy >= W or not active(cx, cy) or at(cx, cy) >= 0: return false
+ return true
+
+func place(id: String, x: int, y: int, initial := false) -> bool:
+ if not can_place(id, x, y, initial): return false
  parts.append({"id":id, "x":x, "y":y, "power":0.0, "ratio":0.0, "load":0.0, "compute":0.0, "stored":0.0, "flow":0.0})
  return true
 

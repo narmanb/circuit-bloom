@@ -5,6 +5,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
@@ -49,11 +51,9 @@ jobs:
         run: |
           keytool -genkeypair -keystore /tmp/circuit-debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/circuit-debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android godot --headless --path . --export-debug Android build/CircuitBloom-Android-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CircuitBloom-Android-debug.apk
-          path: build/CircuitBloom-Android-debug.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CircuitBloom-Windows.zip
-          path: build/CircuitBloom-Windows.zip
+      - name: Publish downloadable prerelease assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${GITHUB_SHA:0:12}"
+          gh release create "$tag" build/CircuitBloom-Android-debug.apk build/CircuitBloom-Windows.zip --target "$GITHUB_SHA" --title "Circuit Bloom prototype ${GITHUB_SHA:0:12}" --notes "Automated Android debug APK and Windows x86_64 export. Debug build for playtesting." --prerelease

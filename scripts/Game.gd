@@ -297,7 +297,7 @@ func draw_board() -> void:
   var c := screen_to_cell(previous_point)
   if c.x >= 0 and c.y >= 0 and c.x < Sim.W and c.y < Sim.W:
    var sz: int = Catalog.PARTS.get(tool, {}).get("size", 1)
-   var okay: bool = tool == "remove" or (model.at(c.x, c.y) < 0 and model.active(c.x, c.y) and model.biomass_used() + Catalog.PARTS[tool].cost <= model.biomass_max)
+   var okay: bool = tool == "remove" or model.can_place(tool, c.x, c.y)
    draw_rect(Rect2(Vector2(c) * CELL, Vector2.ONE * CELL * sz), Color(0.3, 1.0, 0.7, 0.3) if okay else Color(1.0, 0.22, 0.2, 0.3))
  if model.bloom_time > 0.0:
   var wave := (2.0 - model.bloom_time) * 420.0
