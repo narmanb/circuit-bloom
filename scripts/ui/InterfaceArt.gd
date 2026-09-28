@@ -145,7 +145,7 @@ static func draw_header(canvas: CanvasItem, model: BloomSimulation, view: Vector
  for i in ACTIONS.size():
   var id: String = ACTIONS[i]
   var rect := action_rect(i, view)
-  var active := (id == overlay) or (id == "pause" and paused)
+  var active: bool = (id == overlay) or (id == "pause" and paused)
   panel(canvas, rect, Color("3d3420") if active else PANEL, AMBER if active else BORDER)
   draw_action_icon(canvas, id, rect.get_center(), paused, AMBER if active else TEXT)
 
@@ -177,7 +177,7 @@ static func draw_side_panel(canvas: CanvasItem, model: BloomSimulation, view: Ve
 
  for i in CATEGORIES.size():
   var tab := category_rect(i, view)
-  var active := CATEGORIES[i] == category
+  var active: bool = CATEGORIES[i] == category
   panel(canvas, tab, Color("1b526f") if active else Color("202b34"), Color("2b779a") if active else BORDER)
   text(canvas, CATEGORIES[i], tab.position + Vector2(11, 29), 12, TEXT if active else MUTED, tab.size.x - 16)
 
@@ -188,7 +188,7 @@ static func draw_side_panel(canvas: CanvasItem, model: BloomSimulation, view: Ve
   var d: Dictionary = Catalog.PARTS[id]
   var rect := part_rect(i, view)
   var locked: bool = int(d.get("unlock", 0)) > model.level
-  var active := tool == id
+  var active: bool = tool == id
   panel(canvas, rect, Color("253745") if active else (Color("182027") if locked else Color("1c2831")), AMBER if active else BORDER)
   var tint := MUTED if locked else module_color(id)
   BoardArt.symbol(canvas, id, rect.position + Vector2(rect.size.x * 0.5, 28), 0.82, tint)
@@ -247,7 +247,7 @@ static func draw_bottom(canvas: CanvasItem, model: BloomSimulation, view: Vector
  var ids := ["select", "grid", "remove"]
  for i in 3:
   var rect := Rect2(10 + i * 94, y + 6, 84, 52)
-  var active := (ids[i] == "select" and tool == "") or (ids[i] == "remove" and tool == "remove") or (ids[i] == "grid" and grid_visible)
+  var active: bool = (ids[i] == "select" and tool == "") or (ids[i] == "remove" and tool == "remove") or (ids[i] == "grid" and grid_visible)
   panel(canvas, rect, Color("253745") if active else PANEL, AMBER if active else BORDER)
   BoardArt.symbol(canvas, "select" if ids[i] == "grid" else ids[i], rect.position + Vector2(17, 20), 0.55, AMBER if active else MUTED)
   text(canvas, labels[i], rect.position + Vector2(34, 30), 10, TEXT)
