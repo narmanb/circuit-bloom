@@ -21,7 +21,7 @@ The central 10×10 substrate grows to 14, 18, 22, then 24 cells across. Power, c
 
 ## Builds
 
-Pushes and manual GitHub Actions runs import the project, run tests, validate the main scene, and export an Android debug APK. Windows has an export preset and can be built on request; it is not part of routine CI. The Android application ID is `com.narmanb.circuitbloom`, with sensor landscape orientation allowing both landscape directions. Download `CircuitBloom-Android-debug.apk` from the matching GitHub prerelease. GitHub Actions artifact storage is currently at its account quota, so the workflow attaches builds as release assets instead. Release signing can be added with a private keystore and Actions secrets; this workflow only targets debug APKs.
+Pushes and manual GitHub Actions runs import the project, run tests, validate the main scene, and export an Android debug APK. Windows has an export preset and can be built on request; it is not part of routine CI. The Android application ID is `com.narmanb.circuitbloom`, with sensor landscape orientation allowing both landscape directions. Download `CircuitBloom-Android-debug.apk` from the matching GitHub prerelease. GitHub Actions artifact storage is currently at its account quota, so the workflow attaches builds as release assets instead. The checked-in `ci/debug.keystore.b64` is a fixed test-only signing key, so subsequent debug builds can install as updates. Builds before this key was introduced used a fresh ephemeral key and cannot be updated in place; those earlier installs must be uninstalled once. Release signing requires a separate private key held outside the repository.
 
 ## Limits
 

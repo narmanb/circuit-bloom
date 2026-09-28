@@ -44,7 +44,7 @@ jobs:
       - name: Export Android debug
         run: |
           mkdir -p build
-          keytool -genkeypair -keystore /tmp/circuit-debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
+          base64 -d ci/debug.keystore.b64 > /tmp/circuit-debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/circuit-debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android godot --headless --path . --export-debug Android build/CircuitBloom-Android-debug.apk
       - name: Publish downloadable prerelease assets
         env:
