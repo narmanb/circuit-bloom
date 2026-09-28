@@ -96,7 +96,7 @@ func remove(x: int, y: int) -> bool:
 func neighbors(x: int, y: int) -> Array[Vector2i]:
  var out: Array[Vector2i] = []
  for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-  var q := Vector2i(x, y) + dir
+  var q: Vector2i = Vector2i(x, y) + dir
   if q.x >= 0 and q.y >= 0 and q.x < W and q.y < W: out.append(q)
  return out
 
@@ -232,12 +232,18 @@ func thermal_factor(t: float) -> float:
 
 func _heat() -> void:
  var next := heat.duplicate()
+ # Thermal diffusion is a hot path (5 simulation ticks/sec on mobile). Avoid
+ # allocating a neighbors array for every one of the 576 yard cells.
  for y in W:
   for x in W:
    var idx := index(x, y)
+   var center: float = heat[idx]
    var diffusion := 0.0
-   for q in neighbors(x, y): diffusion += heat[index(q.x, q.y)] - heat[idx]
-   next[idx] += DT * (0.14 * diffusion - 0.015 * (heat[idx] - AMBIENT))
+   if x > 0: diffusion += heat[idx - 1] - center
+   if x + 1 < W: diffusion += heat[idx + 1] - center
+   if y > 0: diffusion += heat[idx - W] - center
+   if y + 1 < W: diffusion += heat[idx + W] - center
+   next[idx] += DT * (0.14 * diffusion - 0.015 * (center - AMBIENT))
 
  for p in parts:
   var d: Dictionary = Catalog.PARTS[p.id]
