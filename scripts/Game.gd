@@ -346,6 +346,12 @@ func draw_part(p: Dictionary, tick: float) -> void:
   draw_circle(edge, 2.0, shell.lightened(0.3))
  if id == "core":
   draw_arc(c, r * 0.68, tick * 0.15, tick * 0.15 + TAU * 0.8, 20, Color(0.4, 0.95, 0.75), 2.3)
+  for tier in range(mini(model.level, 4)):
+   var radius := r * (1.0 + tier * 0.13)
+   draw_arc(c, radius, tick * (0.13 if tier % 2 == 0 else -0.11) + tier, tick * (0.13 if tier % 2 == 0 else -0.11) + tier + TAU * 0.66, 25, Color(0.39 + tier * 0.08, 0.89, 0.72, 0.65), 1.4)
+   for branch in 4:
+    var angle := float(branch) * TAU / 4.0 + tier * 0.31
+    draw_line(c + Vector2.from_angle(angle) * radius, c + Vector2.from_angle(angle + 0.16) * (radius + 4.0), Color(0.44, 0.96, 0.73, 0.6), 1.1)
   draw_circle(c, r * (0.25 + sin(tick * 2.2) * 0.035), Color(0.69, 1.0, 0.82))
  elif id == "gland":
   draw_circle(c, r * (0.42 + sin(tick * 2.8) * 0.04), Color(0.38, 0.92, 0.55))

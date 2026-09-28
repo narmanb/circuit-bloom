@@ -1,6 +1,6 @@
 # Circuit Bloom
 
-A 2D biological-computer construction prototype in Godot 4.4.1 (GDScript). Grow a living circuit by connecting energy glands to processors, routing power through finite-capacity tissue, managing local heat, and unlocking substrate as sustained compute goals are met.
+A 2D biological-computer construction prototype in Godot 4.4.1 (GDScript, Mobile renderer). Grow a living circuit by connecting energy glands to processors, routing power through finite-capacity tissue, managing local heat, and unlocking substrate as sustained compute goals are met.
 
 ## Play
 
