@@ -108,7 +108,7 @@ static func draw_pipe(canvas: CanvasItem, model: BloomSimulation, p: Dictionary,
  var dirs := [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]
  var linked := false
  for dir in dirs:
-  var q := Vector2i(p.x, p.y) + dir
+  var q: Vector2i = Vector2i(p.x, p.y) + dir
   if q.x < 0 or q.y < 0 or q.x >= GRID or q.y >= GRID: continue
   var j := model.at(q.x, q.y)
   if j < 0: continue
@@ -139,7 +139,7 @@ static func draw_part(canvas: CanvasItem, model: BloomSimulation, p: Dictionary,
  var sz: int = d.get("size", 1)
  var rect := Rect2(Vector2(p.x, p.y) * CELL + Vector2(3, 3), Vector2.ONE * (CELL * sz - 6))
  var c := rect.get_center()
- var online := float(p.ratio) > 0.05 or p.id in ["gland", "reactor", "radiator", "cooler", "pump", "tank", "transformer", "switchyard", "core"]
+ var online: bool = float(p.ratio) > 0.05 or p.id in ["gland", "reactor", "radiator", "cooler", "pump", "tank", "transformer", "switchyard", "core"]
  equipment_base(canvas, rect)
 
  match p.id:
