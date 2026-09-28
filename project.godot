@@ -1,7 +1,7 @@
 config_version=5
 
 [application]
-config/name="Circuit Bloom"
+config/name="Circuit Bloom - Power Plant Prototype"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.4", "Mobile")
 
