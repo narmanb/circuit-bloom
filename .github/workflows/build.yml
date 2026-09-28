@@ -38,6 +38,7 @@ jobs:
       - name: Import project
         run: godot --headless --path . --editor --import --quit
       - name: Headless simulation tests
+        timeout-minutes: 3
         run: godot --headless --path . --script res://tests/run_tests.gd
       - name: Validate main scene
         run: godot --headless --path . --quit-after 5

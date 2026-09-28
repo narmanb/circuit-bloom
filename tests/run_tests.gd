@@ -68,14 +68,24 @@ func _initialize() -> void:
  thermal.place("vein", 10, 12, true)
  thermal.place("processor", 11, 11, true)
  thermal.place("transformer", 14, 11, true)
- for i in 550: thermal.tick()
+ for i in 80: thermal.tick()
  var hot := thermal.part_temperature(find_part(thermal, "processor"))
  check(hot > 25.0, "operating equipment heats locally")
  var cooled := Sim.new(false)
  cooled.restore(thermal.snapshot())
  cooled.place("radiator", 11, 14, true)
- for i in 350: cooled.tick()
- check(cooled.hottest < thermal.hottest or cooled.part_temperature(find_part(cooled, "processor")) < hot, "cooling tower lowers plant temperature")
+ # Give both copies the same deliberate heat pulse, then compare recovery.
+ var uncooled := Sim.new(false)
+ uncooled.restore(thermal.snapshot())
+ var turbine := find_part(cooled, "processor")
+ for yy in range(turbine.y, turbine.y + 2):
+  for xx in range(turbine.x, turbine.x + 2):
+   cooled.heat[cooled.index(xx, yy)] = 78.0
+   uncooled.heat[uncooled.index(xx, yy)] = 78.0
+ for i in 45:
+  cooled.tick()
+  uncooled.tick()
+ check(cooled.part_temperature(find_part(cooled, "processor")) < uncooled.part_temperature(find_part(uncooled, "processor")), "cooling tower lowers plant temperature")
  check(cooled.thermal_factor(100.0) < 0.1, "extreme heat heavily derates turbines")
 
  var economy := Sim.new(false)
