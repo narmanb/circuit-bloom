@@ -4,33 +4,41 @@ class_name BloomSimulation
 const Catalog = preload("res://scripts/Catalog.gd")
 const W := 24
 const DT := 0.2
+const AMBIENT := 25.0
+
 var parts: Array[Dictionary] = []
 var heat: Array[float] = []
 var level := 0
-var active_size := 10
-var biomass_max := 70
-var compute := 0.0
+var active_size := 12
+var funds := 5200000.0
+var gross_output := 0.0
+var compute := 0.0 # exported MW, kept for compatibility with the old prototype
+var sold_mw := 0.0
 var peak := 0.0
-var generation := 0.0
-var requested := 0.0
-var delivered := 0.0
-var hottest := 25.0
+var generation := 0.0 # steam raised t/h
+var requested := 0.0 # steam requested t/h
+var delivered := 0.0 # steam delivered t/h
+var grid_capacity := 0.0
+var grid_demand := 72.0
+var hottest := AMBIENT
 var sustain := 0.0
 var awakened := false
 var elapsed := 0.0
 var bloom_time := 0.0
+var revenue_total := 0.0
 
 func _init(starting := true) -> void:
  heat.resize(W * W)
- heat.fill(25.0)
+ heat.fill(AMBIENT)
  if starting:
-  place("core", 11, 11, true)
-  place("gland", 9, 12, true)
+  # A small synchronized starter train. The player expands from here.
+  place("core", 11, 8, true)
+  place("gland", 8, 12, true)
+  place("vein", 9, 12, true)
   place("vein", 10, 12, true)
-  place("vein", 11, 12, true)
-  place("vein", 12, 12, true)
-  place("processor", 13, 12, true)
-  place("radiator", 13, 13, true)
+  place("processor", 11, 11, true)
+  place("switchyard", 14, 11, true)
+  place("radiator", 10, 14, true)
   tick()
 
 func index(x: int, y: int) -> int:
@@ -48,46 +56,65 @@ func at(x: int, y: int) -> int:
    return i
  return -1
 
-func biomass_used() -> int:
- var total := 0
+func spent_value() -> float:
+ var total := 0.0
  for p in parts:
-  total += Catalog.PARTS[p.id].cost
+  total += float(Catalog.PARTS[p.id].cost)
  return total
 
 func can_place(id: String, x: int, y: int, initial := false) -> bool:
  if not Catalog.PARTS.has(id): return false
  var d: Dictionary = Catalog.PARTS[id]
+ if id == "core" and not initial: return false
  if not initial and d.get("unlock", 0) > level: return false
- if not initial and biomass_used() + d.cost > biomass_max: return false
+ if not initial and funds + 0.01 < float(d.cost): return false
  var sz: int = d.get("size", 1)
  for cy in range(y, y + sz):
   for cx in range(x, x + sz):
-   if cx < 0 or cy < 0 or cx >= W or cy >= W or not active(cx, cy) or at(cx, cy) >= 0: return false
+   if cx < 0 or cy < 0 or cx >= W or cy >= W: return false
+   if not active(cx, cy) or at(cx, cy) >= 0: return false
  return true
 
 func place(id: String, x: int, y: int, initial := false) -> bool:
  if not can_place(id, x, y, initial): return false
- parts.append({"id":id, "x":x, "y":y, "power":0.0, "ratio":0.0, "load":0.0, "compute":0.0, "stored":0.0, "flow":0.0})
+ var d: Dictionary = Catalog.PARTS[id]
+ parts.append({
+  "id":id, "x":x, "y":y, "power":0.0, "ratio":0.0, "load":0.0,
+  "compute":0.0, "stored":0.0, "flow":0.0, "steam_out":0.0
+ })
+ if not initial:
+  funds -= float(d.cost)
  return true
 
 func remove(x: int, y: int) -> bool:
  var i := at(x, y)
  if i < 0 or parts[i].id == "core": return false
+ funds += float(Catalog.PARTS[parts[i].id].cost) * 0.72
  parts.remove_at(i)
  return true
 
 func neighbors(x: int, y: int) -> Array[Vector2i]:
  var out: Array[Vector2i] = []
  for dir in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-  var q: Vector2i = Vector2i(x, y) + dir
+  var q := Vector2i(x, y) + dir
   if q.x >= 0 and q.y >= 0 and q.x < W and q.y < W: out.append(q)
  return out
 
 func conductive(i: int) -> bool:
  return parts[i].id in ["vein", "bundle"]
 
+func touches_part(a: int, b: int) -> bool:
+ var pa: Dictionary = parts[a]
+ var da: Dictionary = Catalog.PARTS[pa.id]
+ var sa: int = da.get("size", 1)
+ for yy in range(pa.y, pa.y + sa):
+  for xx in range(pa.x, pa.x + sa):
+   for q in neighbors(xx, yy):
+    if at(q.x, q.y) == b: return true
+ return false
+
 func route(source: int, target: int, need: float, availability: float) -> Dictionary:
- # Breadth-first search over actual conductor cells. A route consumes segment throughput.
+ # BFS through explicit steam-pipe cells. Every conductor on the path has its own throughput.
  var queue: Array[int] = [source]
  var parent := {source:-1}
  var head := 0
@@ -102,7 +129,9 @@ func route(source: int, target: int, need: float, availability: float) -> Dictio
      var j := at(q.x, q.y)
      if j < 0 or parent.has(j) or j == i: continue
      if j != target and not conductive(j): continue
-     if conductive(j) and float(Catalog.PARTS[parts[j].id].capacity) - parts[j].load <= 0.001: continue
+     if conductive(j):
+      var cap := float(Catalog.PARTS[parts[j].id].capacity)
+      if cap - float(parts[j].load) <= 0.001: continue
      parent[j] = i
      if j == target:
       var path: Array[int] = []
@@ -112,7 +141,7 @@ func route(source: int, target: int, need: float, availability: float) -> Dictio
        cursor = parent[cursor]
       var amount := minf(need, availability)
       for k in path:
-       amount = minf(amount, float(Catalog.PARTS[parts[k].id].capacity) - parts[k].load)
+       amount = minf(amount, float(Catalog.PARTS[parts[k].id].capacity) - float(parts[k].load))
       return {"amount":amount, "path":path}
      queue.append(j)
  return {"amount":0.0, "path":[]}
@@ -132,15 +161,22 @@ func _deliver(target: int, sources: Array[int], available: Dictionary, amount_ne
    parts[k].load += amount
  return got
 
-func _power() -> void:
+func boiler_multiplier(i: int) -> float:
+ var boosts := 0
+ for j in parts.size():
+  if parts[j].id == "pump" and touches_part(i, j): boosts += 1
+ return 1.0 + minf(0.36, boosts * 0.12)
+
+func _steam() -> void:
  generation = 0.0
  requested = 0.0
  delivered = 0.0
- var generators: Array[int] = []
- var caps: Array[int] = []
- var consumers: Array[int] = []
+ var boilers: Array[int] = []
+ var accumulators: Array[int] = []
+ var turbines: Array[int] = []
  var available := {}
- var cap_remaining := {}
+ var stored_available := {}
+
  for i in parts.size():
   var p := parts[i]
   var d: Dictionary = Catalog.PARTS[p.id]
@@ -149,53 +185,49 @@ func _power() -> void:
   p.load = 0.0
   p.flow = 0.0
   p.compute = 0.0
-  var req: float = d.get("request", 0.0)
-  requested += req
-  if req > 0.0: consumers.append(i)
+  p.steam_out = 0.0
   if d.has("generate"):
-   generators.append(i)
-   generation += d.generate
-   available[i] = float(d.generate)
-  if p.id == "capacitor":
-   caps.append(i)
-   cap_remaining[i] = minf(float(p.stored) / DT, float(Catalog.PARTS["capacitor"].rate))
- # Core, active cooling, processors. Stable position/order within each class.
- consumers.sort_custom(func(a: int, b: int) -> bool:
-  var order := {"core":0, "cooler":1, "processor":2, "cluster":2}
-  var pa: Dictionary = parts[a]
-  var pb: Dictionary = parts[b]
-  return order.get(pa.id, 3) < order.get(pb.id, 3) if order.get(pa.id, 3) != order.get(pb.id, 3) else a < b)
- for target in consumers:
+   boilers.append(i)
+   var output := float(d.generate) * boiler_multiplier(i)
+   generation += output
+   p.steam_out = output
+   available[i] = output
+  if d.has("request"):
+   turbines.append(i)
+   requested += float(d.request)
+  if d.has("storage"):
+   accumulators.append(i)
+   stored_available[i] = minf(float(p.stored) / DT, float(d.rate))
+
+ for target in turbines:
   var d: Dictionary = Catalog.PARTS[parts[target].id]
-  var req: float = d.request
-  var got := _deliver(target, generators, available, req)
-  if got < req and not caps.is_empty():
-   var before := cap_remaining.duplicate()
-   got += _deliver(target, caps, cap_remaining, req - got)
-   for c in caps:
-    var spent: float = (float(before[c]) - float(cap_remaining[c])) * DT
-    parts[c].stored -= spent
+  var req := float(d.request)
+  var got := _deliver(target, boilers, available, req)
+  if got < req and not accumulators.is_empty():
+   var before := stored_available.duplicate()
+   got += _deliver(target, accumulators, stored_available, req - got)
+   for c in accumulators:
+    var spent: float = (float(before[c]) - float(stored_available[c])) * DT
+    parts[c].stored = maxf(0.0, float(parts[c].stored) - spent)
     parts[c].flow -= spent / DT
   parts[target].power = got
-  parts[target].ratio = got / req
+  parts[target].ratio = got / req if req > 0.0 else 1.0
   delivered += got
- # Charge only through a valid connected route, never with free global surplus.
- for cap in caps:
-  var room: float = (float(Catalog.PARTS["capacitor"].storage) - float(parts[cap].stored)) / DT
-  var charge := _deliver(cap, generators, available, minf(float(Catalog.PARTS["capacitor"].rate), room))
+
+ # Store genuine routed surplus only.
+ for cap in accumulators:
+  var d: Dictionary = Catalog.PARTS[parts[cap].id]
+  var room: float = (float(d.storage) - float(parts[cap].stored)) / DT
+  if room <= 0.0: continue
+  var charge := _deliver(cap, boilers, available, minf(float(d.rate), room))
   parts[cap].stored += charge * DT
   parts[cap].flow += charge
- # Independent emergency trickle for a disconnected core, not routed to consumers.
- for p in parts:
-  if p.id == "core" and p.power <= 0.001:
-   p.power = minf(float(Catalog.PARTS["core"].reserve), float(Catalog.PARTS["core"].request))
-   p.ratio = p.power / float(Catalog.PARTS["core"].request)
 
 func thermal_factor(t: float) -> float:
  if t <= 65.0: return 1.0
- if t < 75.0: return lerpf(1.0, 0.85, (t - 65.0) / 10.0)
- if t < 85.0: return lerpf(0.85, 0.5, (t - 75.0) / 10.0)
- if t < 95.0: return lerpf(0.5, 0.12, (t - 85.0) / 10.0)
+ if t < 75.0: return lerpf(1.0, 0.86, (t - 65.0) / 10.0)
+ if t < 85.0: return lerpf(0.86, 0.52, (t - 75.0) / 10.0)
+ if t < 95.0: return lerpf(0.52, 0.12, (t - 85.0) / 10.0)
  return 0.02
 
 func _heat() -> void:
@@ -203,63 +235,76 @@ func _heat() -> void:
  for y in W:
   for x in W:
    var idx := index(x, y)
-   var sum := 0.0
-   for q in neighbors(x, y): sum += heat[index(q.x, q.y)] - heat[idx]
-   next[idx] += DT * (0.16 * sum - 0.018 * (heat[idx] - 25.0))
+   var diffusion := 0.0
+   for q in neighbors(x, y): diffusion += heat[index(q.x, q.y)] - heat[idx]
+   next[idx] += DT * (0.14 * diffusion - 0.015 * (heat[idx] - AMBIENT))
+
  for p in parts:
   var d: Dictionary = Catalog.PARTS[p.id]
   var footprint: int = d.get("size", 1)
-  var ratio: float = p.ratio if d.get("request", 0.0) > 0.0 else 1.0
-  var added: float = d.get("heat", 0.0) * (0.15 + 0.85 * ratio)
+  var work_ratio := float(p.ratio) if d.has("request") else 1.0
+  var added: float = float(d.get("heat", 0.0)) * (0.18 + 0.82 * work_ratio)
   if d.has("capacity"):
-   var load_ratio: float = p.load / float(d.capacity)
-   added += 1.5 * load_ratio * load_ratio
+   var load_ratio := float(p.load) / maxf(1.0, float(d.capacity))
+   added += 1.2 * load_ratio * load_ratio
   for yy in range(p.y, p.y + footprint):
-   for xx in range(p.x, p.x + footprint): next[index(xx, yy)] += DT * added / (footprint * footprint)
+   for xx in range(p.x, p.x + footprint):
+    next[index(xx, yy)] += DT * added / float(footprint * footprint)
   if d.has("cool"):
-   var strength: float = d.cool * ratio
-   for yy in range(maxi(0, p.y - 2), mini(W, p.y + 3)):
-    for xx in range(maxi(0, p.x - 2), mini(W, p.x + 3)):
-     var dist: int = absi(xx - p.x) + absi(yy - p.y)
+   var strength := float(d.cool)
+   for yy in range(maxi(0, p.y - 2), mini(W, p.y + footprint + 2)):
+    for xx in range(maxi(0, p.x - 2), mini(W, p.x + footprint + 2)):
+     var dx := 0 if xx >= p.x and xx < p.x + footprint else mini(absi(xx - p.x), absi(xx - (p.x + footprint - 1)))
+     var dy := 0 if yy >= p.y and yy < p.y + footprint else mini(absi(yy - p.y), absi(yy - (p.y + footprint - 1)))
+     var dist := dx + dy
      if dist <= 2:
       var idx := index(xx, yy)
-      next[idx] -= DT * strength / (1.0 + dist * 1.5) * clampf((heat[idx] - 25.0) / 15.0, 0.0, 1.0)
- hottest = 25.0
+      next[idx] -= DT * strength / (1.0 + dist * 1.25) * clampf((heat[idx] - AMBIENT) / 14.0, 0.0, 1.0)
+
+ hottest = AMBIENT
  for i in next.size():
-  next[i] = maxf(25.0, next[i])
+  next[i] = maxf(AMBIENT, next[i])
   hottest = maxf(hottest, next[i])
  heat = next
 
-func _compute() -> void:
- compute = 0.0
+func part_temperature(p: Dictionary) -> float:
+ var d: Dictionary = Catalog.PARTS[p.id]
+ var sz: int = d.get("size", 1)
+ var t := AMBIENT
+ for yy in range(p.y, p.y + sz):
+  for xx in range(p.x, p.x + sz): t = maxf(t, heat[index(xx, yy)])
+ return t
+
+func _electrical() -> void:
+ gross_output = 0.0
+ grid_capacity = 0.0
  for p in parts:
   var d: Dictionary = Catalog.PARTS[p.id]
   if d.has("compute"):
-   var sz: int = d.get("size", 1)
-   var temp := 25.0
-   for yy in range(p.y, p.y + sz):
-    for xx in range(p.x, p.x + sz): temp = maxf(temp, heat[index(xx, yy)])
-   p.compute = float(d.compute) * p.ratio * thermal_factor(temp)
-   compute += p.compute
+   p.compute = float(d.compute) * float(p.ratio) * thermal_factor(part_temperature(p))
+   gross_output += float(p.compute)
+  if d.has("grid_capacity"):
+   grid_capacity += float(d.grid_capacity)
+
+ compute = minf(gross_output, grid_capacity)
+ grid_demand = minf(620.0, 72.0 + elapsed * 0.18 + level * 18.0)
+ sold_mw = minf(compute, grid_demand)
  peak = maxf(peak, compute)
+
+ # Scaled cashflow for a short prototype session rather than real-world accounting.
+ var earned := sold_mw * 145.0 * DT
+ funds += earned
+ revenue_total += earned
 
 func _milestones() -> void:
  if level >= Catalog.GOALS.size(): return
  var goal: Dictionary = Catalog.GOALS[level]
- var core_on := false
- var processors_on := true
- for p in parts:
-  if p.id == "core": core_on = p.ratio >= 0.7
-  if p.id in ["processor", "cluster"] and p.ratio <= 0.001: processors_on = false
- var okay: bool = compute >= goal.target and core_on
- if level == 2: okay = okay and hottest < 85.0
- if level == 3: okay = okay and processors_on
- if level == 4: okay = okay and hottest < 95.0 and generation - delivered > 0.0
+ var okay: bool = sold_mw >= float(goal.target) and hottest < 96.0
  sustain = sustain + DT if okay else 0.0
  if sustain >= float(goal.seconds):
   level += 1
-  active_size = goal.size
-  biomass_max = goal.biomass
+  active_size = int(goal.size)
+  funds += float(goal.funds)
   sustain = 0.0
   bloom_time = 2.0
   if level == Catalog.GOALS.size(): awakened = true
@@ -267,31 +312,39 @@ func _milestones() -> void:
 func tick() -> void:
  elapsed += DT
  bloom_time = maxf(0.0, bloom_time - DT)
- _power()
+ _steam()
  _heat()
- _compute()
+ _electrical()
  _milestones()
 
 func snapshot() -> Dictionary:
- return {"version":1, "parts":parts.duplicate(true), "heat":heat.duplicate(), "level":level, "active_size":active_size, "biomass_max":biomass_max, "peak":peak, "sustain":sustain, "awakened":awakened, "elapsed":elapsed}
+ return {
+  "version":2, "parts":parts.duplicate(true), "heat":heat.duplicate(), "level":level,
+  "active_size":active_size, "funds":funds, "peak":peak, "sustain":sustain,
+  "awakened":awakened, "elapsed":elapsed, "revenue_total":revenue_total
+ }
 
 func restore(data: Dictionary) -> bool:
- if data.get("version", -1) != 1 or not data.get("parts") is Array or not data.get("heat") is Array or data.heat.size() != W * W: return false
+ if int(data.get("version", -1)) != 2: return false
+ if not data.get("parts") is Array or not data.get("heat") is Array or data.heat.size() != W * W: return false
  var restored: Array[Dictionary] = []
  for p in data.parts:
   if not p is Dictionary or not Catalog.PARTS.has(p.get("id", "")): return false
-  if int(p.get("x", -1)) < 0 or int(p.get("x", -1)) >= W or int(p.get("y", -1)) < 0 or int(p.get("y", -1)) >= W: return false
+  var px := int(p.get("x", -1))
+  var py := int(p.get("y", -1))
+  if px < 0 or py < 0 or px >= W or py >= W: return false
   restored.append(p.duplicate(true))
  parts = restored
  heat.clear()
- for h in data.heat: heat.append(clampf(float(h), 25.0, 500.0))
+ for h in data.heat: heat.append(clampf(float(h), AMBIENT, 500.0))
  level = clampi(int(data.get("level", 0)), 0, Catalog.GOALS.size())
- active_size = clampi(int(data.get("active_size", 10)), 10, W)
- biomass_max = maxi(70, int(data.get("biomass_max", 70)))
- peak = float(data.get("peak", 0.0))
- sustain = float(data.get("sustain", 0.0))
+ active_size = clampi(int(data.get("active_size", 12)), 12, W)
+ funds = maxf(0.0, float(data.get("funds", 5200000.0)))
+ peak = maxf(0.0, float(data.get("peak", 0.0)))
+ sustain = maxf(0.0, float(data.get("sustain", 0.0)))
  awakened = bool(data.get("awakened", false))
- elapsed = float(data.get("elapsed", 0.0))
- _power()
- _compute()
+ elapsed = maxf(0.0, float(data.get("elapsed", 0.0)))
+ revenue_total = maxf(0.0, float(data.get("revenue_total", 0.0)))
+ _steam()
+ _electrical()
  return true

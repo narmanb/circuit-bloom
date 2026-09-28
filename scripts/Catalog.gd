@@ -1,27 +1,91 @@
 extends RefCounted
 class_name BloomCatalog
 
-# Internal IDs are intentionally preserved from the motherboard prototype so the
-# simulation and regression tests can be reused while the theme is prototyped.
+# Costs are dollars. Internal IDs stay compact because they are saved in layouts.
 const PARTS := {
- "core": {"name":"Plant Control", "category":"Support", "cost":0, "request":2.0, "reserve":2.0, "heat":0.4, "ports":"io", "description":"Fixed plant control and auxiliary-service hub. Keep it tied into the process network."},
- "gland": {"name":"Boiler Unit", "category":"Power", "cost":8, "generate":40.0, "heat":2.0, "ports":"out", "description":"Basic boiler producing 40 t/h of usable process steam."},
- "reactor": {"name":"High-Pressure Boiler", "category":"Power", "cost":15, "generate":80.0, "heat":8.0, "ports":"out", "unlock":1, "description":"High-output boiler. Twice the steam, but much more thermal load."},
- "vein": {"name":"Steam Pipe", "category":"Connections", "cost":1, "capacity":25.0, "ports":"io", "description":"Standard process pipe. Drag to route steam between plant equipment."},
- "processor": {"name":"Turbine Generator", "category":"Compute", "cost":6, "request":12.0, "compute":10.0, "heat":7.0, "ports":"in", "description":"Consumes process steam and converts it into electrical output."},
- "radiator": {"name":"Cooling Tower", "category":"Cooling", "cost":5, "cool":3.2, "description":"Passive heat rejection for nearby equipment."},
- "cooler": {"name":"Condenser Train", "category":"Cooling", "cost":7, "request":8.0, "cool":9.0, "ports":"in", "unlock":2, "description":"Active process cooling. Uses service flow to pull down local temperatures."},
- "capacitor": {"name":"Steam Accumulator", "category":"Support", "cost":6, "storage":40.0, "rate":10.0, "ports":"io", "unlock":1, "description":"Stores excess steam and discharges it when turbine demand spikes."},
- "bundle": {"name":"Main Steam Header", "category":"Connections", "cost":2, "capacity":60.0, "ports":"io", "unlock":3, "description":"Large high-throughput steam header for feeding several generation trains."},
- "cluster": {"name":"Turbine Block", "category":"Compute", "cost":14, "size":2, "request":35.0, "compute":45.0, "heat":25.0, "ports":"in", "unlock":3, "description":"Integrated 2×2 turbine-generator block. Efficient output, heavy steam demand and heat."}
+ "core": {
+  "name":"Control Building", "category":"Build", "cost":0, "size":2,
+  "description":"Fixed control room and plant-services hub. It cannot be demolished."
+ },
+ "gland": {
+  "name":"Boiler Unit", "category":"Build", "cost":650000, "generate":55.0, "heat":5.0,
+  "ports":"out", "description":"Raises process steam for connected turbine generators."
+ },
+ "reactor": {
+  "name":"High-Pressure Boiler", "category":"Build", "cost":1450000, "size":2,
+  "generate":125.0, "heat":12.0, "ports":"out", "unlock":1,
+  "description":"Large high-pressure boiler. High steam output with a serious thermal load."
+ },
+ "processor": {
+  "name":"Turbine Generator", "category":"Build", "cost":900000, "size":2,
+  "request":32.0, "compute":48.0, "heat":8.0, "ports":"in",
+  "description":"Consumes steam and turns it into gross electrical output."
+ },
+ "cluster": {
+  "name":"Turbine Block", "category":"Build", "cost":2600000, "size":3,
+  "request":90.0, "compute":165.0, "heat":21.0, "ports":"in", "unlock":3,
+  "description":"Integrated multi-stage turbine-generator train. Powerful, expensive and hot."
+ },
+ "radiator": {
+  "name":"Cooling Tower", "category":"Build", "cost":520000, "size":2,
+  "cool":7.0, "description":"Rejects heat from nearby plant equipment without consuming steam."
+ },
+ "cooler": {
+  "name":"Condenser Train", "category":"Build", "cost":880000, "size":2,
+  "cool":13.0, "unlock":2,
+  "description":"High-capacity local cooling for dense turbine and boiler districts."
+ },
+ "vein": {
+  "name":"Steam Pipe", "category":"Pipes", "cost":35000, "capacity":42.0,
+  "ports":"io", "description":"Standard steam line. Drag across the yard to paint a route."
+ },
+ "bundle": {
+  "name":"Main Steam Header", "category":"Pipes", "cost":85000, "capacity":125.0,
+  "ports":"io", "unlock":2,
+  "description":"Large header for feeding several turbines without choking the route."
+ },
+ "capacitor": {
+  "name":"Steam Accumulator", "category":"Pipes", "cost":560000, "size":2,
+  "storage":120.0, "rate":28.0, "ports":"io", "unlock":1,
+  "description":"Stores surplus steam and releases it during short production shortfalls."
+ },
+ "pump": {
+  "name":"Feedwater Pump", "category":"Pipes", "cost":280000,
+  "cool":1.4, "boiler_boost":0.12,
+  "description":"Improves adjacent boiler throughput and provides a small local cooling effect."
+ },
+ "transformer": {
+  "name":"Step-Up Transformer", "category":"Power", "cost":720000, "size":2,
+  "grid_capacity":135.0,
+  "description":"Adds export capacity between the generators and the external grid."
+ },
+ "switchyard": {
+  "name":"Switchyard Bay", "category":"Power", "cost":420000, "size":2,
+  "grid_capacity":75.0,
+  "description":"Adds grid interconnection capacity and makes additional generation useful."
+ },
+ "tank": {
+  "name":"Water Tank", "category":"Logistics", "cost":390000, "size":2,
+  "cool":2.0, "description":"Water reserve and modest passive cooling for nearby thermal equipment."
+ }
 }
 
-const ORDER := ["vein", "bundle", "gland", "reactor", "processor", "cluster", "radiator", "cooler", "capacitor"]
+const ORDER := [
+ "gland", "reactor", "processor", "cluster", "radiator", "cooler",
+ "vein", "bundle", "capacitor", "pump", "transformer", "switchyard", "tank"
+]
+
+const TAB_ITEMS := {
+ "Build":["gland", "reactor", "processor", "cluster", "radiator", "cooler"],
+ "Power":["transformer", "switchyard"],
+ "Pipes":["vein", "bundle", "capacitor", "pump"],
+ "Logistics":["tank"]
+}
 
 const GOALS := [
- {"name":"GRID SYNC", "target":30.0, "seconds":3.0, "size":14, "biomass":160, "reward":"Steam Accumulator + High-Pressure Boiler"},
- {"name":"STABLE OUTPUT", "target":75.0, "seconds":8.0, "size":16, "biomass":320, "reward":"Condenser Train"},
- {"name":"SECOND TRAIN", "target":150.0, "seconds":12.0, "size":18, "biomass":520, "reward":"Main Steam Header + Turbine Block"},
- {"name":"PLANT EXPANSION", "target":300.0, "seconds":20.0, "size":20, "biomass":800, "reward":"Full central yard"},
- {"name":"FULL LOAD", "target":500.0, "seconds":30.0, "size":20, "biomass":800, "reward":"Free-build operations"}
+ {"name":"GRID SYNC", "target":40.0, "seconds":4.0, "size":14, "funds":1100000, "reward":"High-Pressure Boiler + Steam Accumulator"},
+ {"name":"STABLE EXPORT", "target":90.0, "seconds":10.0, "size":17, "funds":1800000, "reward":"Main Steam Header + Condenser Train"},
+ {"name":"SECOND TRAIN", "target":180.0, "seconds":14.0, "size":20, "funds":2600000, "reward":"Larger central yard"},
+ {"name":"PLANT EXPANSION", "target":320.0, "seconds":20.0, "size":22, "funds":3800000, "reward":"Turbine Block"},
+ {"name":"FULL LOAD", "target":500.0, "seconds":30.0, "size":24, "funds":5000000, "reward":"Full-site free build"}
 ]

@@ -3,265 +3,280 @@ class_name BloomInterfaceArt
 
 const Catalog = preload("res://scripts/Catalog.gd")
 const BoardArt = preload("res://scripts/rendering/BoardArt.gd")
-const TOP := 129.0
-const BOTTOM := 35.0
-const INSPECT_W := 250.0
-const RAIL_W := 132.0
-const FLYOUT_W := 214.0
-const LEFT_W := RAIL_W + FLYOUT_W
-const CATEGORIES := ["Connections", "Power", "Compute", "Cooling", "Support", "Tools"]
+
+const TOP := 76.0
+const BOTTOM := 64.0
+const SIDE_W := 286.0
+const LEFT_W := 0.0
+const INSPECT_W := SIDE_W
+const CATEGORIES := ["Build", "Power", "Pipes", "Logistics"]
 const ACTIONS := ["undo", "redo", "power", "heat", "speed", "pause"]
-const DISPLAY := {"Connections":"Piping", "Power":"Boilers", "Compute":"Turbines", "Cooling":"Cooling", "Support":"Storage", "Tools":"Tools"}
-const BG := Color("11161a")
-const PANEL := Color("20272a")
-const BORDER := Color("626b6c")
-const MUTED := Color("a8afb0")
-const TEXT := Color("f1eee5")
-const AMBER := Color("d7aa4a")
-const BLUE := Color("72c5dc")
-const RED := Color("e2765e")
-const GREEN := Color("82c695")
+const BG := Color("0d1318")
+const PANEL := Color("19232b")
+const PANEL_2 := Color("222d35")
+const BORDER := Color("344451")
+const MUTED := Color("a8b2b9")
+const TEXT := Color("eff3f4")
+const AMBER := Color("f0b332")
+const BLUE := Color("42bce8")
+const RED := Color("ee6b5a")
+const GREEN := Color("68d792")
 
 static func items_for(category: String) -> Array[String]:
+ var raw: Array = Catalog.TAB_ITEMS.get(category, [])
  var result: Array[String] = []
- if category == "Tools": return ["select", "remove"]
- for id in Catalog.ORDER:
-  if Catalog.PARTS[id].category == category: result.append(id)
+ for id in raw: result.append(str(id))
  return result
 
+static func side_x(view: Vector2) -> float:
+ return view.x - SIDE_W
+
 static func action_rect(index: int, view: Vector2) -> Rect2:
- return Rect2(view.x - 390 + index * 64, 6, 60, 38)
+ return Rect2(view.x - SIDE_W - 258 + index * 42, 17, 38, 38)
 
 static func metric_rect(index: int, view: Vector2) -> Rect2:
- var gap := 8.0
- var width := (view.x - 32.0 - gap * 3.0) / 4.0
- return Rect2(16 + index * (width + gap), 48, width, 55)
+ var available := maxf(480.0, view.x - SIDE_W - 364.0)
+ var width := available / 5.0
+ return Rect2(index * width, 0, width, TOP)
 
-static func category_rect(index: int, _view: Vector2) -> Rect2:
- return Rect2(8, TOP + 11 + index * 57, RAIL_W - 16, 52)
+static func category_rect(index: int, view: Vector2) -> Rect2:
+ var w := SIDE_W / 4.0
+ return Rect2(side_x(view) + index * w, TOP, w, 48)
 
-static func part_rect(index: int, _view: Vector2) -> Rect2:
- return Rect2(RAIL_W + 8, TOP + 64 + index * 83, FLYOUT_W - 16, 77)
+static func part_rect(index: int, view: Vector2) -> Rect2:
+ var cols := 2
+ var col := index % cols
+ var row := index / cols
+ var pad := 10.0
+ var w := (SIDE_W - pad * 3.0) / 2.0
+ return Rect2(side_x(view) + pad + col * (w + pad), TOP + 62 + row * 104, w, 94)
+
+static func bottom_tool_rect(index: int, _view: Vector2) -> Rect2:
+ return Rect2(10 + index * 92, 0, 82, 54)
 
 static func text(canvas: CanvasItem, value: String, pos: Vector2, px := 14, tint := TEXT, max_width := -1.0) -> void:
  canvas.draw_string(ThemeDB.fallback_font, pos, value, HORIZONTAL_ALIGNMENT_LEFT, max_width, px, tint)
 
 static func panel(canvas: CanvasItem, rect: Rect2, fill := PANEL, edge := BORDER) -> void:
  canvas.draw_rect(rect, fill)
- canvas.draw_rect(rect, edge, false, 1.1)
- canvas.draw_line(rect.position + Vector2(1, 1), rect.position + Vector2(14, 1), AMBER.darkened(0.25), 2)
+ canvas.draw_rect(rect, edge, false, 1.0)
 
 static func bar(canvas: CanvasItem, rect: Rect2, fraction: float, tint: Color) -> void:
- canvas.draw_rect(rect, Color("0b1012"))
- if fraction > 0.005: canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(fraction, 0.0, 1.0), rect.size.y)), tint)
- canvas.draw_rect(rect, Color("5e6867"), false, 1)
+ canvas.draw_rect(rect, Color("0a1014"))
+ if fraction > 0.004:
+  canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(fraction, 0.0, 1.0), rect.size.y)), tint)
+ canvas.draw_rect(rect, BORDER, false, 1.0)
 
-static func wrapped(canvas: CanvasItem, value: String, pos: Vector2, width: float, px := 13, tint := MUTED) -> void:
+static func money(v: float) -> String:
+ if v >= 1000000.0: return "$%.2fM" % (v / 1000000.0)
+ if v >= 1000.0: return "$%.0fk" % (v / 1000.0)
+ return "$%.0f" % v
+
+static func wrapped(canvas: CanvasItem, value: String, pos: Vector2, width: float, px := 12, tint := MUTED) -> void:
  var line := ""
  var y := pos.y
  for word in value.split(" "):
-  var attempt := word if line.is_empty() else line + " " + word
+  var attempt := str(word) if line.is_empty() else line + " " + str(word)
   if ThemeDB.fallback_font.get_string_size(attempt, HORIZONTAL_ALIGNMENT_LEFT, -1, px).x > width and not line.is_empty():
    text(canvas, line, Vector2(pos.x, y), px, tint)
-   y += px + 5
-   line = word
-  else: line = attempt
+   y += px + 4
+   line = str(word)
+  else:
+   line = attempt
  if not line.is_empty(): text(canvas, line, Vector2(pos.x, y), px, tint)
 
+static func module_color(id: String) -> Color:
+ if id in ["gland", "reactor"]: return AMBER if id == "gland" else RED
+ if id in ["processor", "cluster", "transformer", "switchyard"]: return BLUE
+ if id in ["radiator", "cooler", "pump", "tank"]: return Color("69c7df")
+ if id == "capacitor": return Color("d9ba64")
+ return GREEN
+
 static func status_of(p: Dictionary, temperature: float) -> String:
- if p.id in ["vein", "bundle"]: return "STEAM FLOWING" if p.load > 0.01 else "PIPE IDLE"
+ if p.id in ["vein", "bundle"]: return "STEAM FLOWING" if float(p.load) > 0.01 else "PIPE IDLE"
  if p.id in ["gland", "reactor"]: return "BOILER FIRING"
- if p.id == "radiator": return "REJECTING HEAT"
- if p.id == "capacitor": return "CHARGING" if p.flow > 0.1 else ("DISCHARGING" if p.flow < -0.1 else "STANDBY")
- if p.ratio <= 0.001: return "OFFLINE"
- if p.ratio < 0.4: return "STARVED"
- if p.ratio < 0.8: return "PART LOAD"
+ if p.id in ["transformer", "switchyard"]: return "GRID CONNECTED"
+ if p.id in ["radiator", "cooler", "tank"]: return "COOLING SERVICE"
+ if p.id == "pump": return "FEEDWATER SERVICE"
+ if p.id == "capacitor": return "CHARGING" if float(p.flow) > 0.1 else ("DISCHARGING" if float(p.flow) < -0.1 else "STANDBY")
+ if float(p.ratio) <= 0.001: return "OFFLINE"
+ if float(p.ratio) < 0.45: return "STEAM STARVED"
  if temperature >= 85.0: return "THERMAL DANGER"
- if temperature >= 70.0: return "HOT"
+ if temperature >= 70.0: return "HOT / DERATED"
  return "ONLINE"
 
-static func draw(canvas: CanvasItem, model: BloomSimulation, view: Vector2, category: String, tool: String, selection: int, overlay: String, paused: bool, speed: int, tutorial: int, message: String, message_time: float, help_index: int, zoom: float) -> void:
+static func draw(canvas: CanvasItem, model: BloomSimulation, view: Vector2, category: String, tool: String, selection: int, overlay: String, paused: bool, speed: int, tutorial: int, message: String, message_time: float, help_index: int, zoom: float, grid_visible := false) -> void:
  draw_header(canvas, model, view, overlay, paused, speed)
- draw_build_rail(canvas, model, view, category, tool)
- draw_inspector(canvas, model, view, selection)
- draw_status(canvas, model, view, tool, zoom)
+ draw_side_panel(canvas, model, view, category, tool, selection)
+ draw_bottom(canvas, model, view, tool, zoom, grid_visible)
  if tutorial == 0: draw_tutorial(canvas, view)
  elif help_index >= 0: draw_help(canvas, model, view, help_index)
  if message_time > 0.0:
-  var rect := Rect2(LEFT_W + 20, TOP + 10, minf(470, view.x - LEFT_W - INSPECT_W - 40), 45)
-  panel(canvas, rect, Color("3a3525"), AMBER)
-  text(canvas, message, rect.position + Vector2(12, 29), 14, TEXT, rect.size.x - 22)
+  var rect := Rect2(18, TOP + 12, minf(520.0, view.x - SIDE_W - 36.0), 44)
+  panel(canvas, rect, Color("3a3120"), AMBER)
+  text(canvas, message, rect.position + Vector2(12, 28), 13, TEXT, rect.size.x - 24)
 
 static func draw_header(canvas: CanvasItem, model: BloomSimulation, view: Vector2, overlay: String, paused: bool, speed: int) -> void:
  canvas.draw_rect(Rect2(0, 0, view.x, TOP), BG)
- canvas.draw_line(Vector2(0, TOP - 1), Vector2(view.x, TOP - 1), AMBER.darkened(0.35), 1.5)
- text(canvas, "CIRCUIT BLOOM", Vector2(16, 28), 21, TEXT)
- text(canvas, "POWER PLANT PROTOTYPE  /  CENTRAL YARD", Vector2(17, 42), 10, MUTED)
+ canvas.draw_line(Vector2(0, TOP - 1), Vector2(view.x, TOP - 1), BORDER, 1)
+ var metrics := [
+  {"label":"POWER OUTPUT", "value":"%.0f MW" % model.compute, "sub":"gross %.0f" % model.gross_output, "color":GREEN, "fill":model.compute / maxf(1.0, model.grid_demand)},
+  {"label":"GRID DEMAND", "value":"%.0f MW" % model.grid_demand, "sub":"sold %.0f" % model.sold_mw, "color":BLUE, "fill":model.sold_mw / maxf(1.0, model.grid_demand)},
+  {"label":"HEADROOM", "value":"%+.0f MW" % (model.grid_capacity - model.compute), "sub":"export capacity", "color":BLUE, "fill":maxf(0.0, model.grid_capacity - model.compute) / maxf(1.0, model.grid_capacity)},
+  {"label":"STEAM", "value":"%.0f t/h" % model.delivered, "sub":"%.0f raised" % model.generation, "color":AMBER, "fill":model.delivered / maxf(1.0, model.requested)},
+  {"label":"TEMPERATURE", "value":"%.0f°C" % model.hottest, "sub":"derates >65°C", "color":RED if model.hottest >= 70.0 else GREEN, "fill":clampf((model.hottest - 25.0) / 70.0, 0.0, 1.0)}
+ ]
+ var metric_area := maxf(500.0, view.x - SIDE_W - 364.0)
+ var width := metric_area / 5.0
+ for i in metrics.size():
+  var item: Dictionary = metrics[i]
+  var rect := Rect2(i * width, 0, width, TOP)
+  canvas.draw_line(Vector2(rect.end.x, 0), Vector2(rect.end.x, TOP), Color("25323b"), 1)
+  text(canvas, item.label + "  ⓘ", rect.position + Vector2(12, 19), 10, MUTED, width - 20)
+  text(canvas, item.value, rect.position + Vector2(12, 46), 19, item.color, width - 18)
+  text(canvas, item.sub, rect.position + Vector2(12, 63), 9, MUTED, width - 18)
+  bar(canvas, Rect2(rect.position + Vector2(12, 69), Vector2(width - 24, 4)), float(item.fill), item.color)
+
+ var funds_x := metric_area + 12
+ text(canvas, "FUNDS", Vector2(funds_x, 20), 10, MUTED)
+ text(canvas, money(model.funds), Vector2(funds_x, 47), 18, AMBER)
+ text(canvas, "Day %d  %02d:%02d" % [1 + int(model.elapsed / 180.0), int(fmod(model.elapsed, 180.0) / 7.5), int(fmod(model.elapsed * 8.0, 60.0))], Vector2(funds_x, 64), 9, MUTED)
+
  for i in ACTIONS.size():
   var id: String = ACTIONS[i]
   var rect := action_rect(i, view)
   var active := (id == overlay) or (id == "pause" and paused)
-  panel(canvas, rect, Color("494128") if active else PANEL, AMBER if active else BORDER)
-  draw_action_icon(canvas, id, rect.position + Vector2(17, 17), paused, AMBER if active else TEXT)
-  var caption := "%dx" % speed if id == "speed" else ("Play" if id == "pause" and paused else id.capitalize())
-  text(canvas, caption, rect.position + Vector2(32, 24), 10, TEXT)
- var metrics := [
-  {"name":"ELECTRIC OUTPUT", "value":"%.1f MW" % model.compute, "sub":"Peak %.1f MW" % model.peak, "fill":clampf(model.compute / maxf(30.0, model.peak), 0.0, 1.0), "color":BLUE},
-  {"name":"STEAM DELIVERED", "value":"%d / %d t/h" % [roundi(model.delivered), roundi(model.requested)], "sub":"%d t/h raised" % roundi(model.generation), "fill":clampf(model.delivered / maxf(1.0, model.requested), 0.0, 1.0), "color":AMBER},
-  {"name":"STEAM HEADROOM", "value":"%+d t/h" % roundi(model.generation - model.delivered), "sub":"Available reserve", "fill":clampf((model.generation - model.delivered) / maxf(1.0, model.generation), 0.0, 1.0), "color":GREEN},
-  {"name":"HOTTEST UNIT", "value":"%.0f°C" % model.hottest, "sub":"Output falls above 65°C", "fill":clampf((model.hottest - 25.0) / 70.0, 0.0, 1.0), "color":RED if model.hottest >= 70.0 else BLUE}
- ]
- for i in metrics.size():
-  var item: Dictionary = metrics[i]
-  var rect := metric_rect(i, view)
-  panel(canvas, rect, Color("242c2e"))
-  text(canvas, item.name + "  ⓘ", rect.position + Vector2(10, 13), 10, MUTED)
-  text(canvas, item.value, rect.position + Vector2(10, 37), 18, item.color)
-  text(canvas, item.sub, rect.position + Vector2(rect.size.x * 0.60, 34), 10, MUTED, rect.size.x * 0.37)
-  bar(canvas, Rect2(rect.position + Vector2(9, 49), Vector2(rect.size.x - 18, 3)), item.fill, item.color)
- if model.level < Catalog.GOALS.size():
-  var goal: Dictionary = Catalog.GOALS[model.level]
-  text(canvas, "NEXT  " + goal.name, Vector2(16, 122), 11, AMBER)
-  text(canvas, "%d MW  •  %.0f / %.0f s" % [roundi(goal.target), model.sustain, goal.seconds], Vector2(212, 122), 11, TEXT)
-  bar(canvas, Rect2(Vector2(456, 114), Vector2(maxf(50, view.x - 472), 6)), minf(1, model.sustain / float(goal.seconds)), GREEN)
- else: text(canvas, "FULL LOAD ACHIEVED  /  FREE-BUILD MODE", Vector2(16, 122), 11, GREEN)
+  panel(canvas, rect, Color("3d3420") if active else PANEL, AMBER if active else BORDER)
+  draw_action_icon(canvas, id, rect.get_center(), paused, AMBER if active else TEXT)
 
 static func draw_action_icon(canvas: CanvasItem, id: String, c: Vector2, paused: bool, tint: Color) -> void:
  match id:
   "undo", "redo":
-   var dir := -1.0 if id == "undo" else 1.0
-   canvas.draw_arc(c, 8, -2.4 if dir < 0 else -0.7, 1.7 if dir < 0 else 3.8, 18, tint, 2)
-   canvas.draw_line(c + Vector2(dir * -7, -5), c + Vector2(dir * -12, -5), tint, 2)
+   var flip := -1.0 if id == "undo" else 1.0
+   canvas.draw_arc(c, 9, -2.5 if flip < 0 else -0.65, 1.7 if flip < 0 else 3.8, 18, tint, 2)
+   canvas.draw_line(c + Vector2(flip * -7, -6), c + Vector2(flip * -12, -6), tint, 2)
   "power":
-   canvas.draw_line(c + Vector2(-10, 1), c + Vector2(10, 1), tint, 2.5)
-   canvas.draw_circle(c, 3, tint)
+   canvas.draw_line(c + Vector2(-10, 0), c + Vector2(10, 0), tint, 2.4)
+   canvas.draw_circle(c, 3.2, tint)
   "heat":
-   canvas.draw_arc(c, 8, 0.3, 2.7, 18, tint, 2)
-   canvas.draw_line(c + Vector2(0, 7), c + Vector2(3, -7), tint, 2)
-  "speed": canvas.draw_polyline(PackedVector2Array([c + Vector2(-8, -8), c + Vector2(1, 0), c + Vector2(-8, 8)]), tint, 2.5)
+   canvas.draw_arc(c, 8, 0.3, 2.8, 18, tint, 2)
+   canvas.draw_line(c + Vector2(0, 8), c + Vector2(2, -8), tint, 2)
+  "speed":
+   canvas.draw_polygon(PackedVector2Array([c + Vector2(-7, -8), c + Vector2(7, 0), c + Vector2(-7, 8)]), PackedColorArray([tint]))
   "pause":
-   if paused: canvas.draw_polygon(PackedVector2Array([c + Vector2(-5, -8), c + Vector2(7, 0), c + Vector2(-5, 8)]), PackedColorArray([tint]))
+   if paused:
+    canvas.draw_polygon(PackedVector2Array([c + Vector2(-5, -8), c + Vector2(8, 0), c + Vector2(-5, 8)]), PackedColorArray([tint]))
    else:
     canvas.draw_rect(Rect2(c + Vector2(-7, -8), Vector2(4, 16)), tint)
     canvas.draw_rect(Rect2(c + Vector2(3, -8), Vector2(4, 16)), tint)
 
-static func module_color(id: String) -> Color:
- if id in ["gland", "reactor"]: return AMBER if id == "gland" else RED
- if id in ["processor", "cluster"]: return BLUE
- if id in ["radiator", "cooler"]: return Color("81cfe1")
- if id == "capacitor": return Color("d7bd75")
- return GREEN
+static func draw_side_panel(canvas: CanvasItem, model: BloomSimulation, view: Vector2, category: String, tool: String, selection: int) -> void:
+ var x := side_x(view)
+ canvas.draw_rect(Rect2(x, TOP, SIDE_W, view.y - TOP), Color("101820"))
+ canvas.draw_line(Vector2(x, TOP), Vector2(x, view.y), BORDER, 1)
 
-static func draw_build_rail(canvas: CanvasItem, model: BloomSimulation, view: Vector2, category: String, tool: String) -> void:
- var rail := Rect2(0, TOP, RAIL_W, view.y - TOP - BOTTOM)
- panel(canvas, rail, Color("171e21"), BORDER)
- text(canvas, "BUILD", Vector2(15, TOP + 31), 14, AMBER)
  for i in CATEGORIES.size():
-  var name: String = CATEGORIES[i]
-  var rect := category_rect(i, view)
-  var active := name == category
-  panel(canvas, rect, Color("4a402a") if active else Color("252d30"), AMBER if active else BORDER)
-  BoardArt.symbol(canvas, name, rect.position + Vector2(18, 25), 0.66, AMBER if active else MUTED)
-  text(canvas, DISPLAY.get(name, name), rect.position + Vector2(37, 31), 11, TEXT if active else MUTED, rect.size.x - 40)
- if category.is_empty(): return
- var fly := Rect2(RAIL_W, TOP + 8, FLYOUT_W, view.y - TOP - BOTTOM - 16)
- panel(canvas, fly, Color("20282a"), Color("77705a"))
- text(canvas, str(DISPLAY.get(category, category)).to_upper(), fly.position + Vector2(12, 25), 12, AMBER)
- text(canvas, "Choose equipment, then tap yard.", fly.position + Vector2(12, 45), 10, MUTED)
+  var tab := category_rect(i, view)
+  var active := CATEGORIES[i] == category
+  panel(canvas, tab, Color("1b526f") if active else Color("202b34"), Color("2b779a") if active else BORDER)
+  text(canvas, CATEGORIES[i], tab.position + Vector2(11, 29), 12, TEXT if active else MUTED, tab.size.x - 16)
+
  var items := items_for(category)
- for i in items.size():
+ var visible_rows := mini(3, ceili(items.size() / 2.0))
+ for i in mini(items.size(), 6):
   var id: String = items[i]
+  var d: Dictionary = Catalog.PARTS[id]
   var rect := part_rect(i, view)
-  var d: Dictionary = Catalog.PARTS.get(id, {})
-  var locked: bool = d.get("unlock", 0) > model.level
-  var active := tool == id or (id == "select" and tool == "")
-  panel(canvas, rect, Color("4a432d") if active else (Color("202628") if locked else Color("30383a")), AMBER if active else BORDER)
+  var locked: bool = int(d.get("unlock", 0)) > model.level
+  var active := tool == id
+  panel(canvas, rect, Color("253745") if active else (Color("182027") if locked else Color("1c2831")), AMBER if active else BORDER)
   var tint := MUTED if locked else module_color(id)
-  canvas.draw_rect(Rect2(rect.position + Vector2(8, 10), Vector2(39, 57)), Color("151b1d"))
-  BoardArt.symbol(canvas, id, rect.position + Vector2(27, 38), 0.90, tint)
-  var title: String = "Inspect / Pan" if id == "select" else ("Remove" if id == "remove" else d.name)
-  text(canvas, title, rect.position + Vector2(53, 23), 13, TEXT if not locked else MUTED, rect.size.x - 58)
-  var line := "Tap equipment" if id == "select" else ("Full refund" if id == "remove" else ("UNLOCK: " + Catalog.GOALS[int(d.unlock) - 1].name if locked else "%d build" % d.cost))
-  text(canvas, line, rect.position + Vector2(53, 42), 10, AMBER if locked else tint, rect.size.x - 58)
-  var stats := "Drag to pan" if id == "select" else ("Tap to clear" if id == "remove" else summary_of(d))
-  text(canvas, stats, rect.position + Vector2(53, 61), 9, MUTED, rect.size.x - 58)
- text(canvas, "CONSTRUCTION", fly.position + Vector2(12, fly.size.y - 73), 10, MUTED)
- text(canvas, "%d / %d" % [model.biomass_used(), model.biomass_max], fly.position + Vector2(12, fly.size.y - 50), 17, TEXT)
- bar(canvas, Rect2(fly.position + Vector2(12, fly.size.y - 37), Vector2(fly.size.x - 24, 5)), float(model.biomass_used()) / maxf(1.0, model.biomass_max), AMBER)
+  BoardArt.symbol(canvas, id, rect.position + Vector2(rect.size.x * 0.5, 28), 0.82, tint)
+  text(canvas, str(d.name), rect.position + Vector2(7, 56), 11, TEXT if not locked else MUTED, rect.size.x - 14)
+  var sub := "LOCKED" if locked else money(float(d.cost))
+  text(canvas, sub, rect.position + Vector2(7, 76), 10, AMBER if locked else tint, rect.size.x - 14)
+  text(canvas, summary_of(d), rect.position + Vector2(7, 89), 8, MUTED, rect.size.x - 14)
+
+ var y := TOP + 70 + visible_rows * 104
+ y = maxf(y, TOP + 280)
+ canvas.draw_line(Vector2(x + 10, y), Vector2(view.x - 10, y), BORDER, 1)
+ text(canvas, "NEXT MILESTONE", Vector2(x + 12, y + 25), 10, MUTED)
+ if model.level < Catalog.GOALS.size():
+  var goal: Dictionary = Catalog.GOALS[model.level]
+  text(canvas, goal.name, Vector2(x + 12, y + 48), 15, AMBER, SIDE_W - 24)
+  text(canvas, "Hold %.0f MW for %.0f sec" % [goal.target, goal.seconds], Vector2(x + 12, y + 68), 10, TEXT)
+  bar(canvas, Rect2(x + 12, y + 80, SIDE_W - 24, 5), model.sustain / maxf(0.1, float(goal.seconds)), GREEN)
+  wrapped(canvas, "Reward: " + str(goal.reward), Vector2(x + 12, y + 104), SIDE_W - 24, 10, MUTED)
+ else:
+  text(canvas, "FULL LOAD / FREE BUILD", Vector2(x + 12, y + 50), 14, GREEN)
+
+ if selection >= 0 and selection < model.parts.size():
+  var p: Dictionary = model.parts[selection]
+  var d: Dictionary = Catalog.PARTS[p.id]
+  var iy := view.y - 132
+  canvas.draw_line(Vector2(x + 10, iy - 15), Vector2(view.x - 10, iy - 15), BORDER, 1)
+  text(canvas, d.name, Vector2(x + 12, iy + 5), 14, TEXT, SIDE_W - 24)
+  text(canvas, status_of(p, model.part_temperature(p)), Vector2(x + 12, iy + 23), 10, module_color(p.id))
+  var detail := detail_of(p, d, model)
+  wrapped(canvas, detail, Vector2(x + 12, iy + 43), SIDE_W - 24, 10, MUTED)
 
 static func summary_of(d: Dictionary) -> String:
- if d.has("generate"): return "+%d t/h steam" % roundi(d.generate)
- if d.has("compute"): return "%d MW  •  %d t/h" % [roundi(d.compute), roundi(d.request)]
- if d.has("capacity"): return "%d t/h throughput" % roundi(d.capacity)
- if d.has("cool"): return "Cooling %.1f" % d.cool
- if d.has("storage"): return "%d t storage" % roundi(d.storage)
- return "Plant support"
+ if d.has("generate"): return "+%.0f t/h steam" % d.generate
+ if d.has("compute"): return "%.0f MW rated" % d.compute
+ if d.has("capacity"): return "%.0f t/h line" % d.capacity
+ if d.has("grid_capacity"): return "+%.0f MW export" % d.grid_capacity
+ if d.has("cool"): return "cooling %.1f" % d.cool
+ if d.has("storage"): return "%.0f t storage" % d.storage
+ return "plant support"
 
-static func draw_inspector(canvas: CanvasItem, model: BloomSimulation, view: Vector2, selection: int) -> void:
- var x := view.x - INSPECT_W
- var rect := Rect2(x, TOP, INSPECT_W, view.y - TOP - BOTTOM)
- panel(canvas, rect, Color("171f22"), BORDER)
- text(canvas, "EQUIPMENT", Vector2(x + 15, TOP + 30), 13, AMBER)
- if selection < 0 or selection >= model.parts.size():
-  text(canvas, "Nothing selected", Vector2(x + 15, TOP + 66), 17, TEXT)
-  wrapped(canvas, "Use Inspect / Pan and tap a placed unit to see steam, output, load and thermal state.", Vector2(x + 15, TOP + 94), INSPECT_W - 30, 12, MUTED)
-  return
- var p: Dictionary = model.parts[selection]
- var d: Dictionary = Catalog.PARTS[p.id]
- var sz: int = d.get("size", 1)
- var temp := 25.0
- for yy in range(p.y, p.y + sz):
-  for xx in range(p.x, p.x + sz): temp = maxf(temp, model.heat[model.index(xx, yy)])
- var tint := module_color(p.id)
- text(canvas, d.name, Vector2(x + 15, TOP + 65), 19, TEXT, INSPECT_W - 30)
- text(canvas, status_of(p, temp), Vector2(x + 15, TOP + 88), 11, tint)
- BoardArt.symbol(canvas, p.id, Vector2(x + INSPECT_W - 38, TOP + 66), 1.0, tint)
- wrapped(canvas, d.description, Vector2(x + 15, TOP + 122), INSPECT_W - 30, 11, MUTED)
- var y := TOP + 206
- var rows: Array[String] = []
- if d.has("generate"): rows.append("Steam raised   %d t/h" % roundi(d.generate))
- if d.has("request"): rows.append("Steam demand   %d t/h" % roundi(d.request))
- if d.has("compute"): rows.append("Rated output   %d MW" % roundi(d.compute))
- if d.has("capacity"): rows.append("Throughput     %d t/h" % roundi(d.capacity))
- if d.has("storage"): rows.append("Stored         %.1f / %.0f t" % [p.stored, d.storage])
- if d.has("cool"): rows.append("Cooling        %.1f" % d.cool)
- rows.append("Temperature    %.0f°C" % temp)
- if p.load > 0.0: rows.append("Current flow   %.1f t/h" % p.load)
- if p.compute > 0.0: rows.append("Live output    %.1f MW" % p.compute)
- for row in rows:
-  text(canvas, row, Vector2(x + 15, y), 12, TEXT)
-  y += 25
+static func detail_of(p: Dictionary, d: Dictionary, model: BloomSimulation) -> String:
+ var bits: Array[String] = []
+ if d.has("generate"): bits.append("Steam %.0f t/h" % float(p.steam_out))
+ if d.has("request"): bits.append("Steam %.0f/%.0f" % [float(p.power), float(d.request)])
+ if d.has("compute"): bits.append("Output %.0f MW" % float(p.compute))
+ if d.has("capacity"): bits.append("Flow %.0f/%.0f" % [float(p.load), float(d.capacity)])
+ if d.has("storage"): bits.append("Stored %.0f/%.0f" % [float(p.stored), float(d.storage)])
+ bits.append("%.0f°C" % model.part_temperature(p))
+ return "  •  ".join(bits)
 
-static func draw_status(canvas: CanvasItem, model: BloomSimulation, view: Vector2, tool: String, zoom: float) -> void:
- canvas.draw_rect(Rect2(0, view.y - BOTTOM, view.x, BOTTOM), BG)
- canvas.draw_line(Vector2(0, view.y - BOTTOM), Vector2(view.x, view.y - BOTTOM), BORDER, 1)
- var tool_name := "Inspect / Pan" if tool == "" else ("Remove" if tool == "remove" else Catalog.PARTS.get(tool, {}).get("name", tool))
- text(canvas, "TOOL  " + tool_name, Vector2(14, view.y - 12), 10, AMBER)
- text(canvas, "YARD %d×%d   •   ZOOM %d%%" % [model.active_size, model.active_size, roundi(zoom * 100.0)], Vector2(222, view.y - 12), 10, MUTED)
- text(canvas, "Drag pipes/remove to paint  •  Other tools drag to pan  •  Pinch to zoom", Vector2(480, view.y - 12), 10, MUTED, view.x - 490)
+static func draw_bottom(canvas: CanvasItem, model: BloomSimulation, view: Vector2, tool: String, zoom: float, grid_visible: bool) -> void:
+ var y := view.y - BOTTOM
+ canvas.draw_rect(Rect2(0, y, view.x - SIDE_W, BOTTOM), BG)
+ canvas.draw_line(Vector2(0, y), Vector2(view.x - SIDE_W, y), BORDER, 1)
+ var labels := ["Inspect", "Grid", "Demolish"]
+ var ids := ["select", "grid", "remove"]
+ for i in 3:
+  var rect := Rect2(10 + i * 94, y + 6, 84, 52)
+  var active := (ids[i] == "select" and tool == "") or (ids[i] == "remove" and tool == "remove") or (ids[i] == "grid" and grid_visible)
+  panel(canvas, rect, Color("253745") if active else PANEL, AMBER if active else BORDER)
+  BoardArt.symbol(canvas, "select" if ids[i] == "grid" else ids[i], rect.position + Vector2(17, 20), 0.55, AMBER if active else MUTED)
+  text(canvas, labels[i], rect.position + Vector2(34, 30), 10, TEXT)
+ text(canvas, "YARD %d×%d  •  ZOOM %d%%" % [model.active_size, model.active_size, roundi(zoom * 100.0)], Vector2(307, y + 23), 10, MUTED)
+ text(canvas, "Drag pipes to paint  •  Inspect drag to pan  •  Pinch / wheel to zoom", Vector2(307, y + 43), 10, MUTED, view.x - SIDE_W - 320)
 
 static func draw_tutorial(canvas: CanvasItem, view: Vector2) -> void:
- canvas.draw_rect(Rect2(Vector2.ZERO, view), Color(0.02, 0.03, 0.03, 0.72))
- var r := Rect2(view * 0.5 - Vector2(255, 142), Vector2(510, 284))
- panel(canvas, r, Color("20282a"), AMBER)
- text(canvas, "POWER PLANT PROTOTYPE", r.position + Vector2(26, 42), 24, TEXT)
- text(canvas, "Build the plant, not just the courtyard.", r.position + Vector2(26, 70), 14, AMBER)
- wrapped(canvas, "Boilers raise steam. Pipes carry it. Turbine generators turn steam into MW. Cooling keeps equipment out of thermal throttle. Expand the yard by holding each output milestone.", r.position + Vector2(26, 105), r.size.x - 52, 13, MUTED)
- text(canvas, "Tap anywhere to begin", r.position + Vector2(26, r.size.y - 27), 14, GREEN)
+ canvas.draw_rect(Rect2(Vector2.ZERO, view), Color(0.01, 0.02, 0.025, 0.74))
+ var r := Rect2(view * 0.5 - Vector2(270, 150), Vector2(540, 300))
+ panel(canvas, r, Color("17222a"), AMBER)
+ text(canvas, "POWER PLANT PROTOTYPE", r.position + Vector2(28, 44), 24, TEXT)
+ text(canvas, "Build the plant, not just the courtyard.", r.position + Vector2(28, 73), 14, AMBER)
+ wrapped(canvas, "Boilers raise steam. Pipes physically route it. Turbines turn delivered steam into MW. Transformers and switchyard bays limit how much power can leave the site. Cooling prevents thermal derating. Sell electricity, earn funds, and hold output targets to unlock a larger yard and heavier equipment.", r.position + Vector2(28, 111), r.size.x - 56, 13, MUTED)
+ text(canvas, "Tap anywhere to begin", r.position + Vector2(28, r.size.y - 27), 14, GREEN)
 
 static func help_data(index: int, model: BloomSimulation) -> Dictionary:
  match index:
-  0: return {"title":"ELECTRIC OUTPUT", "body":"Live MW from turbine generators after steam supply and thermal throttling. This is the main progression target."}
-  1: return {"title":"STEAM DELIVERED", "body":"Steam that successfully reaches plant consumers through connected pipes. A turbine with insufficient delivery runs at part load."}
-  2: return {"title":"STEAM HEADROOM", "body":"Boiler production minus current delivery. Positive reserve helps with new turbines, but pipe throughput can still bottleneck a route even when total steam is available."}
-  3: return {"title":"HOTTEST UNIT", "body":"The hottest grid cell in the plant. Turbines begin losing output above 65°C, so cooling placement matters as the yard becomes denser."}
+  0: return {"title":"POWER OUTPUT", "body":"MW that can actually leave the plant after turbine output, temperature derating, and grid export capacity are applied."}
+  1: return {"title":"GRID DEMAND", "body":"Current customer demand. Only power up to this amount earns revenue, so overbuilding generation too early ties up funds."}
+  2: return {"title":"HEADROOM", "body":"Unused transformer and switchyard export capacity. A plant can have plenty of steam and turbine output but still bottleneck here."}
+  3: return {"title":"STEAM", "body":"Steam successfully delivered through connected pipes. Pipe capacity is local: one narrow segment can starve several turbines."}
+  4: return {"title":"TEMPERATURE", "body":"Hottest equipment temperature. Turbine output begins derating above 65°C and collapses if the plant is allowed to overheat."}
  return {"title":"PLANT METRIC", "body":"Operational status."}
 
 static func draw_help(canvas: CanvasItem, model: BloomSimulation, view: Vector2, index: int) -> void:
- canvas.draw_rect(Rect2(Vector2.ZERO, view), Color(0.01, 0.02, 0.02, 0.48))
+ canvas.draw_rect(Rect2(Vector2.ZERO, view), Color(0.01, 0.02, 0.02, 0.50))
  var data := help_data(index, model)
- var r := Rect2(view * 0.5 - Vector2(235, 105), Vector2(470, 210))
- panel(canvas, r, Color("222a2c"), AMBER)
- text(canvas, data.title, r.position + Vector2(22, 42), 20, TEXT)
- wrapped(canvas, data.body, r.position + Vector2(22, 76), r.size.x - 44, 13, MUTED)
- text(canvas, "Tap outside to close", r.position + Vector2(22, r.size.y - 22), 11, AMBER)
+ var r := Rect2(view * 0.5 - Vector2(240, 110), Vector2(480, 220))
+ panel(canvas, r, Color("1b262e"), AMBER)
+ text(canvas, data.title, r.position + Vector2(24, 43), 20, TEXT)
+ wrapped(canvas, data.body, r.position + Vector2(24, 82), r.size.x - 48, 13, MUTED)
+ text(canvas, "Tap outside to close", r.position + Vector2(24, r.size.y - 24), 11, AMBER)
