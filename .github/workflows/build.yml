@@ -41,14 +41,9 @@ jobs:
         run: godot --headless --path . --script res://tests/run_tests.gd
       - name: Validate main scene
         run: godot --headless --path . --quit-after 5
-      - name: Export Windows
-        run: |
-          mkdir -p build
-          godot --headless --path . --export-release "Windows Desktop" build/CircuitBloom.exe
-          cd build && zip -q CircuitBloom-Windows.zip CircuitBloom.exe
-          if [ -f CircuitBloom.pck ]; then zip -q CircuitBloom-Windows.zip CircuitBloom.pck; fi
       - name: Export Android debug
         run: |
+          mkdir -p build
           keytool -genkeypair -keystore /tmp/circuit-debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH=/tmp/circuit-debug.keystore GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android godot --headless --path . --export-debug Android build/CircuitBloom-Android-debug.apk
       - name: Publish downloadable prerelease assets
@@ -56,4 +51,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${GITHUB_SHA:0:12}"
-          gh release create "$tag" build/CircuitBloom-Android-debug.apk build/CircuitBloom-Windows.zip --target "$GITHUB_SHA" --title "Circuit Bloom prototype ${GITHUB_SHA:0:12}" --notes "Automated Android debug APK and Windows x86_64 export. Debug build for playtesting." --prerelease
+          gh release create "$tag" build/CircuitBloom-Android-debug.apk --target "$GITHUB_SHA" --title "Circuit Bloom prototype ${GITHUB_SHA:0:12}" --notes "Automated Android debug APK for playtesting." --prerelease

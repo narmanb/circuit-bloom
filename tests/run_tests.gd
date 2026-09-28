@@ -1,5 +1,7 @@
 extends SceneTree
 const Sim = preload("res://scripts/Simulation.gd")
+const Game = preload("res://scripts/Game.gd")
+const UI = preload("res://scripts/ui/InterfaceArt.gd")
 var failures := 0
 var checks := 0
 
@@ -117,5 +119,12 @@ func _initialize() -> void:
  milestones.sustain = 3.0
  milestones._milestones()
  check(milestones.sustain == 0.0, "sustain reset")
+ var game := Game.new()
+ game.size = Vector2(1280, 720)
+ check(game.ui_button_at(UI.action_rect(3, game.size).get_center()) == "heat", "heat button hit target")
+ check(game.ui_button_at(UI.category_rect(2, game.size).get_center()) == "category:Compute", "category tab hit target")
+ game.category = "Compute"
+ check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "cluster", "part card hit target")
+ game.free()
  print("Circuit Bloom tests: ", checks - failures, "/", checks)
  quit(1 if failures else 0)
