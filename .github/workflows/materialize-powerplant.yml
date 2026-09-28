@@ -25,7 +25,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add scripts tests project.godot export_presets.cfg README.md POWER_PLANT_PROTOTYPE.md .github/workflows/build.yml
+          git add scripts tests project.godot export_presets.cfg README.md POWER_PLANT_PROTOTYPE.md
           if git diff --cached --quiet; then
             echo "No source changes to materialize"
             exit 0
