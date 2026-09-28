@@ -18,13 +18,13 @@ func find_part(m: BloomSimulation, id: String) -> Dictionary:
 
 func _initialize() -> void:
  var m := Sim.new()
- check(find_part(m, "processor").power > 0.0, "starting processor powered")
- check(m.compute > 0.0, "starting computation")
+ check(find_part(m, "processor").power > 0.0, "starting turbine powered")
+ check(m.compute > 0.0, "starting electrical output")
  var disconnected := Sim.new(false)
  disconnected.place("gland", 8, 8)
  disconnected.place("processor", 14, 14)
  disconnected.tick()
- check(find_part(disconnected, "processor").power == 0.0, "disconnected processor")
+ check(find_part(disconnected, "processor").power == 0.0, "disconnected turbine")
  var bottleneck := Sim.new(false)
  bottleneck.place("gland", 7, 12)
  bottleneck.place("vein", 8, 12)
@@ -39,7 +39,7 @@ func _initialize() -> void:
  var total := 0.0
  for p in bottleneck.parts:
   if p.id == "processor": total += p.power
- check(total <= 25.001 and total > 20.0, "shared conductor throughput")
+ check(total <= 25.001 and total > 20.0, "shared steam-pipe throughput")
  var thin := total
  bottleneck.level = 3
  bottleneck.remove(8, 12)
@@ -53,7 +53,7 @@ func _initialize() -> void:
  total = 0.0
  for p in bottleneck.parts:
   if p.id == "processor": total += p.power
- check(total > thin, "bundle trunk improvement")
+ check(total > thin, "main steam header improves trunk")
  var thermal := Sim.new(false)
  thermal.place("gland", 9, 12)
  thermal.place("vein", 10, 12)
@@ -73,7 +73,7 @@ func _initialize() -> void:
  cooled.place("processor", 11, 12)
  cooled.place("radiator", 11, 13)
  for i in 500: cooled.tick()
- check(cooled.heat[cooled.index(11, 12)] < hot, "passive radiator lowers equilibrium")
+ check(cooled.heat[cooled.index(11, 12)] < hot, "cooling tower lowers equilibrium")
  var active_cooling := Sim.new(false)
  active_cooling.place("gland", 9, 12)
  active_cooling.place("vein", 10, 12)
@@ -82,27 +82,27 @@ func _initialize() -> void:
  active_cooling.level = 2
  active_cooling.place("cooler", 11, 13)
  for i in 500: active_cooling.tick()
- check(find_part(active_cooling, "cooler").power > 0.0, "active cooler receives routed power")
- check(active_cooling.heat[active_cooling.index(11, 12)] < cooled.heat[cooled.index(11, 12)], "powered cooling beats passive cooling")
- var capacitor := Sim.new(false)
- capacitor.level = 1
- capacitor.place("gland", 7, 12)
- for x in range(8, 12): capacitor.place("vein", x, 12)
- capacitor.place("processor", 12, 12)
- capacitor.place("capacitor", 11, 11)
- for i in 30: capacitor.tick()
- check(find_part(capacitor, "capacitor").stored > 0.0, "connected capacitor charges under surplus")
- capacitor.place("processor", 11, 13)
- capacitor.place("processor", 10, 11)
- capacitor.place("processor", 10, 13)
+ check(find_part(active_cooling, "cooler").power > 0.0, "condenser train receives routed service flow")
+ check(active_cooling.heat[active_cooling.index(11, 12)] < cooled.heat[cooled.index(11, 12)], "active condenser beats passive cooling")
+ var accumulator := Sim.new(false)
+ accumulator.level = 1
+ accumulator.place("gland", 7, 12)
+ for x in range(8, 12): accumulator.place("vein", x, 12)
+ accumulator.place("processor", 12, 12)
+ accumulator.place("capacitor", 11, 11)
+ for i in 30: accumulator.tick()
+ check(find_part(accumulator, "capacitor").stored > 0.0, "connected steam accumulator charges under surplus")
+ accumulator.place("processor", 11, 13)
+ accumulator.place("processor", 10, 11)
+ accumulator.place("processor", 10, 13)
  var empty := Sim.new(false)
- empty.restore(capacitor.snapshot())
+ empty.restore(accumulator.snapshot())
  for p in empty.parts:
   if p.id == "capacitor": p.stored = 0.0
- capacitor.tick()
+ accumulator.tick()
  empty.tick()
- check(capacitor.delivered > empty.delivered, "charged capacitor softens overload")
- check(find_part(capacitor, "capacitor").stored < 40.0, "capacitor discharges finite energy")
+ check(accumulator.delivered > empty.delivered, "charged accumulator softens overload")
+ check(find_part(accumulator, "capacitor").stored < 40.0, "accumulator discharges finite steam")
  var saved := cooled.snapshot()
  var loaded := Sim.new(false)
  check(loaded.restore(JSON.parse_string(JSON.stringify(saved))), "JSON save/load snapshot")
@@ -111,10 +111,10 @@ func _initialize() -> void:
  milestones.place("core", 9, 9)
  milestones.level = 0
  milestones.compute = 50.0
- # Milestone guard uses a powered core.
+ # Grid Sync requires a powered plant-control unit and 3 seconds at target.
  milestones.parts[0].ratio = 1.0
- milestones._milestones()
- check(milestones.level == 1 and milestones.active_size == 14, "first milestone expands substrate")
+ for i in 16: milestones._milestones()
+ check(milestones.level == 1 and milestones.active_size == 14, "Grid Sync expands central yard")
  milestones.compute = 0.0
  milestones.sustain = 3.0
  milestones._milestones()
@@ -123,32 +123,32 @@ func _initialize() -> void:
  basic_power.place("gland", 10, 10)
  var advanced_power := Sim.new(false)
  advanced_power.level = 1
- check(advanced_power.place("reactor", 10, 10), "reactor unlocks after First Pulse")
+ check(advanced_power.place("reactor", 10, 10), "high-pressure boiler unlocks after Grid Sync")
  for pos in [Vector2i(9, 10), Vector2i(11, 10), Vector2i(10, 9), Vector2i(10, 11)]:
   basic_power.place("processor", pos.x, pos.y)
   advanced_power.place("processor", pos.x, pos.y)
  basic_power.tick()
  advanced_power.tick()
- check(advanced_power.generation == 80.0 and advanced_power.compute > basic_power.compute, "reactor output tradeoff")
+ check(advanced_power.generation == 80.0 and advanced_power.compute > basic_power.compute, "high-pressure boiler output tradeoff")
  for i in 50:
   basic_power.tick()
   advanced_power.tick()
- check(advanced_power.heat[advanced_power.index(10, 10)] > basic_power.heat[basic_power.index(10, 10)], "reactor generates extra heat")
+ check(advanced_power.heat[advanced_power.index(10, 10)] > basic_power.heat[basic_power.index(10, 10)], "high-pressure boiler generates extra heat")
  var game := Game.new()
  game.size = Vector2(1280, 720)
  check(game.ui_button_at(UI.action_rect(3, game.size).get_center()) == "heat", "heat button hit target")
- check(game.ui_button_at(UI.metric_rect(2, game.size).get_center()) == "metric:2", "headroom help hit target")
- check(UI.help_data(2, m).body.contains("throughput"), "headroom explanation covers route limits")
- check(game.ui_button_at(UI.category_rect(2, game.size).get_center()) == "category:Compute", "category tab hit target")
+ check(game.ui_button_at(UI.metric_rect(2, game.size).get_center()) == "metric:2", "steam headroom help hit target")
+ check(UI.help_data(2, m).body.contains("throughput"), "steam headroom explanation covers route limits")
+ check(game.ui_button_at(UI.category_rect(2, game.size).get_center()) == "category:Compute", "turbine category hit target")
  game.category = "Compute"
- check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "cluster", "part card hit target")
+ check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "cluster", "turbine flyout offers turbine block")
  game.choose_button("metric:2")
  check(game.help_index == 2, "metric opens explanation")
  game.choose_button("metric:2")
  check(game.help_index == -1, "metric toggles explanation")
  game.category = "Power"
- check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "reactor", "power cascade offers reactor")
+ check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "reactor", "boiler flyout offers high-pressure boiler")
  check(not game.on_board(UI.part_rect(1, game.size).get_center()), "build flyout shields board interaction")
  game.free()
- print("Circuit Bloom tests: ", checks - failures, "/", checks)
+ print("Circuit Bloom power-plant tests: ", checks - failures, "/", checks)
  quit(1 if failures else 0)
