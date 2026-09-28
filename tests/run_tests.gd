@@ -119,12 +119,36 @@ func _initialize() -> void:
  milestones.sustain = 3.0
  milestones._milestones()
  check(milestones.sustain == 0.0, "sustain reset")
+ var basic_power := Sim.new(false)
+ basic_power.place("gland", 10, 10)
+ var advanced_power := Sim.new(false)
+ advanced_power.level = 1
+ check(advanced_power.place("reactor", 10, 10), "reactor unlocks after First Pulse")
+ for pos in [Vector2i(9, 10), Vector2i(11, 10), Vector2i(10, 9), Vector2i(10, 11)]:
+  basic_power.place("processor", pos.x, pos.y)
+  advanced_power.place("processor", pos.x, pos.y)
+ basic_power.tick()
+ advanced_power.tick()
+ check(advanced_power.generation == 80.0 and advanced_power.compute > basic_power.compute, "reactor output tradeoff")
+ for i in 50:
+  basic_power.tick()
+  advanced_power.tick()
+ check(advanced_power.heat[advanced_power.index(10, 10)] > basic_power.heat[basic_power.index(10, 10)], "reactor generates extra heat")
  var game := Game.new()
  game.size = Vector2(1280, 720)
  check(game.ui_button_at(UI.action_rect(3, game.size).get_center()) == "heat", "heat button hit target")
+ check(game.ui_button_at(UI.metric_rect(2, game.size).get_center()) == "metric:2", "headroom help hit target")
+ check(UI.help_data(2, m).body.contains("throughput"), "headroom explanation covers route limits")
  check(game.ui_button_at(UI.category_rect(2, game.size).get_center()) == "category:Compute", "category tab hit target")
  game.category = "Compute"
  check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "cluster", "part card hit target")
+ game.choose_button("metric:2")
+ check(game.help_index == 2, "metric opens explanation")
+ game.choose_button("metric:2")
+ check(game.help_index == -1, "metric toggles explanation")
+ game.category = "Power"
+ check(game.ui_button_at(UI.part_rect(1, game.size).get_center()) == "reactor", "power cascade offers reactor")
+ check(not game.on_board(UI.part_rect(1, game.size).get_center()), "build flyout shields board interaction")
  game.free()
  print("Circuit Bloom tests: ", checks - failures, "/", checks)
  quit(1 if failures else 0)

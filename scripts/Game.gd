@@ -13,7 +13,7 @@ var overlay := ""
 var selected := -1
 var paused := false
 var speed := 1
-var zoom := 1.0
+var zoom := 1.18
 var pan := Vector2.ZERO
 var clock := 0.0
 var visual_time := 0.0
@@ -30,6 +30,7 @@ var pinch_distance := 0.0
 var pinch_midpoint := Vector2.ZERO
 var message := ""
 var message_time := 0.0
+var help_index := -1
 var last_level := 0
 
 func _ready() -> void:
@@ -84,7 +85,10 @@ func _process(delta: float) -> void:
  queue_redraw()
 
 func board_origin() -> Vector2:
- return Vector2((size.x - InterfaceArt.INSPECT_W - 12.0) * 0.5, (InterfaceArt.TOP + size.y - InterfaceArt.DOCK) * 0.5) + pan
+ return Vector2((InterfaceArt.LEFT_W + size.x - InterfaceArt.INSPECT_W - 10.0) * 0.5, (InterfaceArt.TOP + size.y - InterfaceArt.BOTTOM) * 0.5) + pan
+
+func on_board(pos: Vector2) -> bool:
+ return pos.x >= InterfaceArt.LEFT_W and pos.x < size.x - InterfaceArt.INSPECT_W - 10.0 and pos.y > InterfaceArt.TOP and pos.y < size.y - InterfaceArt.BOTTOM
 
 func world_to_screen(cell: Vector2) -> Vector2:
  return board_origin() + (cell - Vector2(12, 12)) * CELL * zoom
@@ -97,17 +101,24 @@ func ui_button_at(pos: Vector2) -> String:
  if pos.y < 47.0:
   for i in InterfaceArt.ACTIONS.size():
    if InterfaceArt.action_rect(i, size).has_point(pos): return InterfaceArt.ACTIONS[i]
- if pos.y >= size.y - InterfaceArt.DOCK:
-  for i in InterfaceArt.CATEGORIES.size():
-   if InterfaceArt.category_rect(i, size).has_point(pos): return "category:" + InterfaceArt.CATEGORIES[i]
+ for i in 4:
+  if InterfaceArt.metric_rect(i, size).has_point(pos): return "metric:" + str(i)
+ for i in InterfaceArt.CATEGORIES.size():
+  if InterfaceArt.category_rect(i, size).has_point(pos): return "category:" + InterfaceArt.CATEGORIES[i]
+ if not category.is_empty():
   var items := InterfaceArt.items_for(category)
   for i in items.size():
    if InterfaceArt.part_rect(i, size).has_point(pos): return items[i]
  return ""
 
 func choose_button(id: String) -> void:
+ if id.begins_with("metric:"):
+  var requested := int(id.substr(7))
+  help_index = -1 if help_index == requested else requested
+  return
  if id.begins_with("category:"):
-  category = id.substr(9)
+  var requested := id.substr(9)
+  category = "" if category == requested else requested
   tool = ""
   return
  match id:
@@ -173,7 +184,7 @@ func edit_at(pos: Vector2) -> void:
    selected = model.parts.size() - 1
    save_game()
   elif not painting:
-   message = "Blocked: space, dormant tissue, unlock, or biomass"
+   message = "Cannot build: check space, district, unlock or capacity"
    message_time = 2.0
 
 func pointer_down(pos: Vector2, index: int) -> void:
@@ -202,7 +213,7 @@ func pointer_move(pos: Vector2, index: int) -> void:
   pinch_midpoint = new_mid
   return
  if gesture_start.distance_to(pos) > 13.0: dragging = true
- if dragging and gesture_start.y < size.y - InterfaceArt.DOCK and gesture_start.y > InterfaceArt.TOP:
+ if dragging and on_board(gesture_start):
   if tool in ["vein", "bundle", "remove"]:
    if not painting:
     edit_at(gesture_start)
@@ -227,8 +238,12 @@ func pointer_up(pos: Vector2, index: int) -> void:
   tutorial = 1
   return
  var button := ui_button_at(pos)
+ if help_index >= 0:
+  if button.begins_with("metric:"): choose_button(button)
+  else: help_index = -1
+  return
  if button != "": choose_button(button)
- elif pos.y > InterfaceArt.TOP and pos.y < size.y - InterfaceArt.DOCK: edit_at(pos)
+ elif on_board(pos): edit_at(pos)
 
 func _gui_input(event: InputEvent) -> void:
  if event is InputEventScreenTouch:
@@ -259,11 +274,11 @@ func _draw() -> void:
  draw_set_transform(board_origin() - Vector2(12, 12) * CELL * zoom, 0.0, Vector2.ONE * zoom)
  var preview := Vector2i(-1, -1)
  var preview_ok := false
- if not touches.is_empty() and tool != "" and not dragging:
+ if not touches.is_empty() and tool != "" and not dragging and on_board(previous_point):
   preview = screen_to_cell(previous_point)
   if preview.x >= 0 and preview.y >= 0 and preview.x < Sim.W and preview.y < Sim.W:
    preview_ok = (model.at(preview.x, preview.y) >= 0 and model.parts[model.at(preview.x, preview.y)].id != "core") if tool == "remove" else model.can_place(tool, preview.x, preview.y)
   else: preview = Vector2i(-1, -1)
  BoardArt.draw_board(self, model, visual_time, overlay, tool, selected, preview, preview_ok)
  draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
- InterfaceArt.draw(self, model, size, category, tool, selected, overlay, paused, speed, tutorial, message, message_time)
+ InterfaceArt.draw(self, model, size, category, tool, selected, overlay, paused, speed, tutorial, message, message_time, help_index, zoom)
