@@ -12,6 +12,13 @@ jobs:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
+      - name: Reconstruct generated equipment artwork
+        run: |
+          cat assets/generated/atlas.part0 assets/generated/atlas.part1 assets/generated/atlas.part2 | base64 -d > assets/powerplant_equipment_atlas.webp
+          test "$(stat -c%s assets/powerplant_equipment_atlas.webp)" -gt 15000
+          sed -i 's/const ATLAS_TILE := 256.0/const ATLAS_TILE := 80.0/' scripts/rendering/BoardArt.gd
+          sed -i 's/  "vein", "bundle": return 9/  "vein", "bundle": return -1/' scripts/rendering/BoardArt.gd
+          sed -i 's/  "Pipes":/  "vein", "bundle", "Pipes":/' scripts/rendering/BoardArt.gd
       - name: Install Godot 4.4.1 and templates
         run: |
           curl -fL --retry 3 -o /tmp/godot.zip https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip
@@ -52,4 +59,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="powerplant-${GITHUB_SHA:0:12}"
-          gh release create "$tag" build/CircuitBloom-PowerPlant-Android-debug.apk --target "$GITHUB_SHA" --title "Circuit Bloom Power Plant ${GITHUB_SHA:0:12}" --notes "Android debug APK for the power-plant prototype branch." --prerelease
+          gh release create "$tag" build/CircuitBloom-PowerPlant-Android-debug.apk --target "$GITHUB_SHA" --title "Circuit Bloom Power Plant ${GITHUB_SHA:0:12}" --notes "Android debug APK for the power-plant prototype branch. Generated equipment artwork reconstructed before import." --prerelease
