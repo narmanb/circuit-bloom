@@ -6,7 +6,7 @@ const BACKGROUND: Texture2D = preload("res://assets/power_plant_background.jpg")
 const EQUIPMENT_ATLAS: Texture2D = preload("res://assets/powerplant_equipment_atlas.webp")
 const GRID := 24
 const CELL := 34.0
-const ATLAS_TILE := 256.0
+const ATLAS_TILE := 80.0
 const INK := Color("111719")
 const STEEL := Color("b5bec0")
 const DARK_STEEL := Color("465156")
@@ -28,7 +28,7 @@ static func atlas_index(id: String) -> int:
   "transformer": return 6
   "switchyard": return 7
   "capacitor", "tank": return 8
-  "vein", "bundle": return 9
+  "vein", "bundle": return -1
  return -1
 
 static func atlas_region(id: String) -> Rect2:
@@ -38,6 +38,40 @@ static func atlas_region(id: String) -> Rect2:
  var row := i / 5
  return Rect2(Vector2(col, row) * ATLAS_TILE, Vector2.ONE * ATLAS_TILE)
 
+static func equipment_visual_span(id: String, logical_size: int) -> float:
+ # Logical footprints still control placement/collision. The art deliberately
+ # overhangs those footprints so plant equipment reads as machinery instead of tiles.
+ match id:
+  "gland": return 1.55
+  "reactor": return 2.62
+  "processor": return 2.52
+  "cluster": return 3.62
+  "radiator": return 2.72
+  "cooler": return 2.48
+  "pump": return 1.24
+  "transformer": return 2.22
+  "switchyard": return 2.52
+  "capacitor": return 2.18
+  "tank": return 2.34
+ return maxf(1.0, float(logical_size))
+
+static func equipment_visual_offset(id: String) -> Vector2:
+ # Small offsets keep tall/heavy equipment visually grounded while preserving
+ # its logical cell anchor for simulation and selection.
+ match id:
+  "gland": return Vector2(0, -5)
+  "reactor": return Vector2(0, -8)
+  "processor": return Vector2(4, -1)
+  "cluster": return Vector2(7, -2)
+  "radiator": return Vector2(0, -10)
+  "cooler": return Vector2(5, -2)
+  "pump": return Vector2(0, -1)
+  "transformer": return Vector2(2, -4)
+  "switchyard": return Vector2(5, -2)
+  "capacitor": return Vector2(0, -6)
+  "tank": return Vector2(0, -7)
+ return Vector2.ZERO
+
 static func symbol(canvas: CanvasItem, id: String, center: Vector2, scale: float, color: Color) -> void:
  var idx := atlas_index(id)
  if idx >= 0:
@@ -46,7 +80,7 @@ static func symbol(canvas: CanvasItem, id: String, center: Vector2, scale: float
   return
  var r := 13.0 * scale
  match id:
-  "Pipes":
+  "vein", "bundle", "Pipes":
    canvas.draw_line(center + Vector2(-r, 0), center + Vector2(r, 0), color, 3.2 * scale, true)
    canvas.draw_circle(center, 3.0 * scale, STEEL)
   "Build":
@@ -157,9 +191,12 @@ static func draw_part(canvas: CanvasItem, model: BloomSimulation, p: Dictionary,
  else:
   var idx := atlas_index(p.id)
   if idx >= 0:
-   var grow := 7.0 if sz == 1 else 2.0
-   var dest := logical_rect.grow(grow)
-   canvas.draw_rect(dest.grow(2), Color(0.01, 0.012, 0.012, 0.34))
+   var visual_px := CELL * equipment_visual_span(p.id, sz)
+   var visual_center := logical_rect.get_center() + equipment_visual_offset(p.id)
+   var dest := Rect2(visual_center - Vector2.ONE * visual_px * 0.5, Vector2.ONE * visual_px)
+   var shadow_size := Vector2(visual_px * 0.62, maxf(5.0, visual_px * 0.14))
+   var shadow_pos := visual_center + Vector2(-shadow_size.x * 0.5, visual_px * 0.31)
+   canvas.draw_rect(Rect2(shadow_pos, shadow_size), Color(0.01, 0.012, 0.012, 0.28))
    canvas.draw_texture_rect_region(EQUIPMENT_ATLAS, dest, atlas_region(p.id))
    if p.id == "reactor": canvas.draw_rect(logical_rect.grow(1), Color(0.95, 0.35, 0.18, 0.48), false, 2.0)
    elif p.id in ["processor", "cluster"] and online:
